@@ -1133,7 +1133,7 @@ window.interval = setInterval(function () {
     });
     select.value = (new URL(location.href)).searchParams.get('roomid') || 'admin_st';
     document.getElementById('area-selection').onchange = select.onchange = () => {
-      history.replaceState(null, '', '?areaid=' + vueApp.areaId + '&roomid=' + select.value);
+      history.replaceState(null, '', '?areaid=' + (document.getElementById('gen-selection')?.checked ? 'gen' : 'for') + '&roomid=' + select.value);
     };
     select.style.display = 'block';
     loginButton.before(select);
