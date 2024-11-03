@@ -5,6 +5,15 @@
   window.extension = true;
 
   var VERSION = 88;
+  var innerJSML = element => Array.from(element.childNodes).map(node => {
+    if (node.tagName) {
+      var attrs = {};
+      for (var attr of node.attributes)
+        attrs[attr.name] = attr.value;
+      return [node.tagName, attrs, innerJSML(node)];
+    }
+    return node.nodeValue || '';
+  });
   var JSML = function (parent, mode, jsml) {
     if (mode === 'clear')
       parent.textContent = '';
@@ -974,11 +983,13 @@
     JSML(document.documentElement, 'clear', [
       ['head', [
         ['title', title],
+        ['meta', {name: 'viewport', content: 'width=device-width, initial-scale=1.0'}],
         ['style', `
 html,body,#chatLog,input{margin:0;padding:0;box-sizing:border-box;width:100%;height:100%;resize:none;overflow:auto}
 #chatLog{height:calc(100% - 3em);padding:2px;font-size:12px}
 .message-timestamp,.ignored-message{display:none}
-input{display:block;position:fixed;bottom:0;height:2em}`],
+input{display:block;position:fixed;bottom:0;height:2em}
+.inactive-message:before{opacity:0.5}`],
         ['style', {id: 'log-style'}],
         ...colorStyleJSML
       ]],
@@ -1301,7 +1312,7 @@ input{display:block;position:fixed;bottom:0;height:2em}`],
                         (experimentalConfig.hidePIP ? '.experimental-buttons{display:none}' : '') +
                         (experimentalConfig.brightness ? '#room-canvas{filter: brightness(' + experimentalConfig.brightness + ')}' : '') +
                         (experimentalConfig.showColorPicker ? '' : '#colorPicker{visibility:hidden;width:0;padding:0;border:0}') +
-                        (experimentalConfig.silence ? '' : '#silence{display:none}') +
+                        (experimentalConfig.silence || /iPhone|iPad/.test(navigator.userAgent) ? '' : '#silence{display:none}') +
                         (experimentalConfig.outdoor ? 'h1,#character-selection,#canvas-container,.changelog{display:none}' : '');
     if (experimentalConfig.iconSize)
       characterLogCSS.textContent = characterLogCSS.textContent.replace(/--characterlog-size:\d+px/, '--characterlog-size:' + experimentalConfig.iconSize + 'px');
@@ -1968,7 +1979,9 @@ input{display:block;position:fixed;bottom:0;height:2em}`],
       logWindow.onstorage();
       logWindow._vueApp = window._vueApp;
       (function onload() {
-        var log = logWindow.document.importNode(document.getElementById('chatLog'), true);
+        var log = logWindow.document.createElement('div');
+        log.id = 'chatLog';
+        JSML(log, 'append', innerJSML(document.getElementById('chatLog')));
         log.style.height = log.style.width = '';
         logWindow.document.body.firstElementChild.before(log);
         log.scrollTop = log.scrollHeight - log.clientHeight;

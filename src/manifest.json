@@ -3,7 +3,7 @@
   "default_locale": "en_US",
   "name": "__MSG_extName__",
   "description": "__MSG_extDescription__",
-  "version": "88",
+  "version": "89",
   "author": "iwamizawa-software",
   "content_scripts": [
     {
