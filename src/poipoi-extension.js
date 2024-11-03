@@ -5,7 +5,35 @@
   window.extension = true;
 
   var VERSION = 88;
-  var escapeHTML = html => (html + '').replace(/[<>&"']/g, c => '&#' + c.charCodeAt(0) + ';');
+  var JSML = function (parent, mode, jsml) {
+    if (mode === 'clear')
+      parent.textContent = '';
+    if (typeof jsml === 'string')
+      jsml = [jsml];
+    if (jsml?.constructor !== Array)
+      return;
+    var document = parent.ownerDocument;
+    jsml.forEach(data => {
+      if (data?.constructor !== Array) {
+        parent.appendChild(document.createTextNode(data));
+        return;
+      }
+      var element = parent.appendChild(document.createElement(data[0])), childNodes;
+      if (data[1]?.constructor === Object) {
+        childNodes = data[2];
+        for (attr in data[1]) {
+          if (typeof data[1][attr] === 'string')
+            element.setAttribute(attr, data[1][attr]);
+          else
+            element[attr] = data[1][attr];
+        }
+      } else {
+        childNodes = data[1];
+      }
+      if (childNodes)
+        JSML(element, 'append', childNodes);
+    });
+  };
   var generateConfigMenu = function () {
     return [
       {
@@ -590,7 +618,7 @@
       }
     ];
   };
-  var generateConfigHTML = function (title, langCode, configMenu, experimentalConfig) {
+  var writeConfigHTML = function (document, title, langCode, configMenu, experimentalConfig) {
     var configScript = function (langCode, configMenu, experimentalConfig) {
       window.extension = true;
       var text = function () {return arguments[langCode]};
@@ -616,7 +644,7 @@
               break;
             case 'color':
             case 'list':
-              element.innerHTML = '';
+              element.textContent = '';
               value?.forEach?.(value => {
                 var option = element.appendChild(document.createElement('option'));
                 option.text = value;
@@ -846,23 +874,22 @@
         defaultValue[item.key] = item.value;
       });
       load(defaultValue);
-      document.querySelector('head').appendChild(document.createElement('style')).textContent = 'h1{color:#06f;cursor:pointer;text-decoration:underline;margin:0;padding:10px 0}.hide{display:none}label{padding:10px;display:inline-block}input[type=button]{padding-left:30px;padding-right:30px;}';
+      document.head.appendChild(document.createElement('style')).textContent = 'h1{color:#06f;cursor:pointer;text-decoration:underline;margin:0;padding:10px 0}.hide{display:none}label{padding:10px;display:inline-block}input[type=button]{padding-left:30px;padding-right:30px;}';
       Array.from(document.getElementsByTagName('h1')).forEach(h1 => h1.click());
       load(experimentalConfig);
     };
-    return `<!doctype html>
-<head>
-<title>${escapeHTML(title)}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
-<script>
-(${configScript})(${JSON.stringify(langCode)}, ${JSON.stringify(configMenu)}, ${JSON.stringify(experimentalConfig)});
-</script>
-</body>
-`;
+    JSML(document.documentElement, 'clear', [
+      ['head', [
+        ['title', title],
+        ['meta', {name: 'viewport', content: 'width=device-width, initial-scale=1.0'}]
+      ]],
+      ['body']
+    ]);
+    JSML(document.head, 'append', [
+      ['script', `(${configScript})(${JSON.stringify(langCode)}, ${JSON.stringify(configMenu)}, ${JSON.stringify(experimentalConfig)})`]
+    ]);
   };
-  var generateChessHTML = function (title, fens, linkText) {
+  var writeChessHTML = function (document, title, fens, linkText) {
     var chessScript = function (fens) {
       var fenToData = function (fen) {
         if (!fen)
@@ -917,38 +944,51 @@
       };
       document.body.appendChild(document.createElement('pre')).textContent = fenToPgn(fens);
     };
-    return `<!doctype html>
-<title>${escapeHTML(title)}</title>
-<body>
-<script>(${chessScript})(${JSON.stringify(fens)});</script>
-<p><a href="https://www.chesscompass.com/analyze" target="_blank">${escapeHTML(linkText)}</a></body>
-`;
+    JSML(document.documentElement, 'clear', [
+      ['head', [
+        ['title', title]
+      ]],
+      ['body', [
+        ['p', [
+          ['a', {href: 'https://www.chesscompass.com/analyze', target: '_blank'}, linkText]
+        ]],
+      ]]
+    ]);
+    JSML(document.head, 'append', [
+      ['script', `(${chessScript})(${JSON.stringify(fens)});`]
+    ]);
   };
-  var generateLogWindowHTML = function (title, colorStyleHTML , disconnectMessage) {
-    return `<!doctype html>
-<head>
-<title>${escapeHTML(title)}</title>
-<style>
+  var writeLogWindowHTML = function (document, title, colorStyleJSML , disconnectMessage) {
+    var logWindowScript = function (disconnectMessage) {
+      window.extension = true;
+      window.interval = setInterval(function () {
+        try {
+          if (opener.logWindow !== window)
+            throw 1;
+        } catch (err) {
+          document.title = disconnectMessage;
+          clearInterval(interval);
+        }
+      }, 10000);
+    };
+    JSML(document.documentElement, 'clear', [
+      ['head', [
+        ['title', title],
+        ['style', `
 html,body,#chatLog,input{margin:0;padding:0;box-sizing:border-box;width:100%;height:100%;resize:none;overflow:auto}
 #chatLog{height:calc(100% - 3em);padding:2px;font-size:12px}
 .message-timestamp,.ignored-message{display:none}
-input{display:block;position:fixed;bottom:0;height:2em}
-</style>
-<style id="log-style"></style>
-${colorStyleHTML}
-<script>window.extension = true;
-window.interval = setInterval(function () {
-  try {
-    if (opener.logWindow !== window)
-      throw 1;
-  } catch (err) {
-    document.title = ${JSON.stringify(disconnectMessage)};
-    clearInterval(interval);
-  }
-}, 10000);</script>
-</head>
-<body><input type="text" id="input-textbox"></body>
-`;
+input{display:block;position:fixed;bottom:0;height:2em}`],
+        ['style', {id: 'log-style'}],
+        ...colorStyleJSML
+      ]],
+      ['body', [
+        ['input', {type: 'text', id: 'input-textbox'}]
+      ]]
+    ]);
+    JSML(document.head, 'append', [
+      ['script', `(${logWindowScript})(${JSON.stringify(disconnectMessage)});`]
+    ]);
   };
 
   var disableButtonContainer = document.createElement('div');
@@ -1108,9 +1148,23 @@ window.interval = setInterval(function () {
       roomNameToKey[key] = roomNameToKey[halfSize] = roomNameToKey[halfSize.toLowerCase()] = roomNameToKey[roomName.toLowerCase()] = key;
     });
     roomNameToKey['開発前'] = 'admin_st';
-    roomNameRegex = new RegExp('(^|じゃ|[ 　「])(' + Object.keys(roomNameToKey).sort((a, b) => b.length - a.length).join('|') + ')(で$|$|に?(?:来|集|きて|こい|行|[居い][るた])|にて|[ 　」])', 'g');
+    roomNameRegex = new RegExp('(^|じゃ|[ 　「])(' + Object.keys(roomNameToKey).sort((a, b) => b.length - a.length).join('|') + ')(で$|$|に?(?:来|集|きて|こい|行|[居い][るた])|にて|[ 　」])');
   };
-  var replaceRulaLink = html => html.replace(roomNameRegex, (s, s1, s2, s3) => `${s1}<a href="javascript:void%20_vueApp.changeRoom('${roomNameToKey[s2]}')">${s2}</a>${s3}`);
+  var applyRulaLink = element => {
+    Array.from(element.children).forEach(applyRulaLink);
+    Array.from(element.childNodes).forEach(node => {
+      var m = node.nodeValue?.match(roomNameRegex);
+      if (!m)
+        return;
+      var a = document.createElement('a');
+      a.text = m[2];
+      a.href = `javascript:void%20_vueApp.changeRoom('${roomNameToKey[a.text]}')`;
+      var texts = node.nodeValue.split(a.text);
+      element.replaceChild(a, node);
+      a.before(texts.shift());
+      a.after(texts.join(a.text));
+    });
+  };
 
   var vueApp = window._vueApp = await ready(await ready(await ready(await ready(await ready(window, 'vueApp'), '_container'), '_vnode'), 'component'), 'proxy');
   vueApp.toDisplayName = name => name || vueApp.$i18next.t('default_user_name');
@@ -1155,7 +1209,7 @@ window.interval = setInterval(function () {
   silenceAudio.loop = silenceAudio.controls = true;
   silenceAudio.setAttribute('style', 'position:fixed;bottom:0;right:0');
   document.body.append(silenceAudio);
-  document.querySelector('head').appendChild(document.createElement('style')).textContent = '#main-section{padding-bottom:20px}';
+  document.head.appendChild(document.createElement('style')).textContent = '#main-section{padding-bottom:20px}';
   document.addEventListener('beforeunload', () => silenceAudio.stop());
 
   if (localStorage.getItem('isInfoboxVisible') === null)
@@ -1168,7 +1222,8 @@ window.interval = setInterval(function () {
     if (experimentalConfig.clearBubble || silent)
       vueApp.socket.emit('user-msg', '');
   };
-  var asyncAlert = text => new Promise(resolve => vueApp.openDialog(text, '', ['OK'], 0, resolve));
+  // Mozilla 誤検出対策
+  var asyncAlert = text => new Promise(resolve => vueApp['openDialog'](text, '', ['OK'], 0, resolve));
   var createButtonContainer = function () {
     var fakePopup = document.createElement('div');
     fakePopup.className = 'popup';
@@ -1205,7 +1260,7 @@ window.interval = setInterval(function () {
   // キャラ付ログ
   var characterLogCSS = document.createElement('style');
   characterLogCSS.textContent = ':root{--characterlog-size:25px}.message:not(.system-message):before{content: "";width:var(--characterlog-size);height:var(--characterlog-size);display:inline-block;background-size:contain;background-repeat:no-repeat;vertical-align:bottom;margin-right:5px}';
-  document.querySelector('head').append(characterLogCSS);
+  document.head.append(characterLogCSS);
   var loadCharacterIcon = function (name, notAlt) {
     var data = characterIconData[name] || (characterIconData[name] = {type: '.svg', x: -50, y: 24, width: 190});
     if (data.loaded)
@@ -1229,10 +1284,10 @@ window.interval = setInterval(function () {
       };
   };
   // userscript CSS
-  document.querySelector('head').appendChild(document.createElement('style')).textContent = '#chat-log-label{display:none}#chat-log-container{flex-direction:column}#enableSpeech:checked+button{background-color:#9f6161}.inactive-message:before{opacity:0.5}';
+  document.head.appendChild(document.createElement('style')).textContent = '#chat-log-label{display:none}#chat-log-container{flex-direction:column}#enableSpeech:checked+button{background-color:#9f6161}.inactive-message:before{opacity:0.5}';
   // config
-  var userCSS = document.querySelector('head').appendChild(document.createElement('style')), mentionSound, experimentalConfig;
-  var vnCSS = document.querySelector('head').appendChild(document.createElement('style'));
+  var userCSS = document.head.appendChild(document.createElement('style')), mentionSound, experimentalConfig;
+  var vnCSS = document.head.appendChild(document.createElement('style'));
   var apply = function () {
     userCSS.textContent = experimentalConfig.userCSS || '';
     vnCSS.textContent = (experimentalConfig.vtuberNiconico & 1 ? '.vtuber-character{display:none}' : '') +
@@ -1665,10 +1720,10 @@ window.interval = setInterval(function () {
     return v;
   };
   // 自動色分け
-  var saveTripColor = () => localStorage.setItem('experimentalColor', Array.from(document.querySelectorAll('.tripColor')).reduce((html, style) => html + style.outerHTML, ''));
-  document.querySelector('head').insertAdjacentHTML('beforeend', localStorage.getItem('experimentalColor') || '');
-  var setLogColor = () => {
-  };
+  var saveTripColor = () => localStorage.setItem('experimentalTripColor', JSON.stringify(
+    Array.from(document.querySelectorAll('.tripColor')).map(element => ['style', {'class': 'tripColor', id: element.id}, element.textContent])
+  ));
+  JSML(document.head, 'append', JSON.parse(localStorage.getItem('experimentalTripColor')));
   // ログ右クリックメニュー
   var logMenu = document.body.appendChild(document.createElement('select'));
   var selectedMessage = {};
@@ -1679,13 +1734,13 @@ window.interval = setInterval(function () {
         var colorPicker = document.getElementById('colorPicker');
         var styleId = selectedMessage.trip || selectedMessage.userId;
         var attrName = selectedMessage.trip ? 'data-trip' : 'data-user-id';
-        var style = (document.getElementById('color-' + styleId) || document.querySelector('head').appendChild(document.createElement('style')));
+        var style = (document.getElementById('color-' + styleId) || document.head.appendChild(document.createElement('style')));
         style.id = 'color-' + styleId;
         if (selectedMessage.trip)
           style.className = 'tripColor';
         if (logWindow && !logWindow.closed) {
           var logDoc = logWindow.document;
-          var style2 = (logDoc.getElementById(style.id) || logDoc.querySelector('head').appendChild(logDoc.createElement('style')));
+          var style2 = (logDoc.getElementById(style.id) || logDoc.head.appendChild(logDoc.createElement('style')));
           style2.id = style.id;
         }
         (colorPicker.onchange = colorPicker.oninput = function () {
@@ -1744,15 +1799,15 @@ window.interval = setInterval(function () {
         trip: event.target.parentNode.dataset.trip || '',
         body: event.target.parentNode.querySelector('.message-body')?.textContent || ''
       };
-      logMenu.innerHTML = `
-<option disabled selected>-
-<option value="color">${text('色', 'Color')}
-<option value="uncolor">${text('色解除', 'Uncolor')}
-<option value="mention">${text('メンション', 'Mention')}
-<option value="quote">${text('引用', 'Quote')}
-<option value="ignore">${text('一方あぼーん', 'Ignore')}
-<option value="block">${text('相互あぼーん', 'Block')}
-`;
+      JSML(logMenu, 'clear', [
+        ['option', {disabled: true, selected: true}, '-'],
+        ['option', {value: 'color'}, text('色', 'Color')],
+        ['option', {value: 'uncolor'}, text('色解除', 'Uncolor')],
+        ['option', {value: 'mention'}, text('メンション', 'Mention')],
+        ['option', {value: 'quote'}, text('引用', 'Quote')],
+        ['option', {value: 'ignore'}, text('一方あぼーん', 'Ignore')],
+        ['option', {value: 'block'}, text('相互あぼーん', 'Block')]
+      ]);
       logMenu.size = logMenu.options.length;
       logMenu.options[0].text = selectedMessage.name = (event.target.textContent[0] === '◆' ? event.target.previousSibling.textContent : '') + event.target.textContent;
       logMenu.style.bottom = (document.documentElement.clientHeight - event.clientY) + 'px';
@@ -1780,11 +1835,11 @@ window.interval = setInterval(function () {
       try {
         // 白トリップ表示
         if (experimentalConfig.numbering === 2 && aChild.dataset.userId && aChild.dataset.userId !== 'null')
-          aChild.querySelector('.message-author').innerHTML += toIHash(aChild.dataset.userId);
+          JSML(aChild.querySelector('.message-author'), 'append', toIHash(aChild.dataset.userId));
         // ルーラリンク
         var messageBody = aChild.querySelector('.message-body>span') || aChild.querySelector('.message-body');
-        if (messageBody && !aChild.querySelector('.message-body a') && (messageBodyHTML = replaceRulaLink(messageBody.innerHTML)) !== messageBody.innerHTML)
-          messageBody.innerHTML = messageBodyHTML;
+        if (messageBody)
+          applyRulaLink(messageBody);
         if (!this.childNodes.length)
           Array.from(document.querySelectorAll('style[id^=color-]:not(.tripColor)')).forEach(style => style.remove());
         if (aChild.dataset.userId && aChild.dataset.userId !== 'null') {
@@ -1800,18 +1855,18 @@ window.interval = setInterval(function () {
             aChild.dataset.trip = RegExp.$1;
           if (experimentalConfig.autoColor && (!aChild.dataset.trip || !document.getElementById('color-' + aChild.dataset.trip)) && !document.getElementById('color-' + aChild.dataset.userId)) {
             var colorList = experimentalConfig.autoColorList?.length ? experimentalConfig.autoColorList : ['#ff8000', '#008000', '#0080ff', '#8060ff', '#ff60ff'];
-            var style = document.querySelector('head').appendChild(document.createElement('style'));
+            var style = document.head.appendChild(document.createElement('style'));
             style.id = 'color-' + aChild.dataset.userId;
             style.textContent = `[data-user-id="${aChild.dataset.userId}"],[data-user-id="${aChild.dataset.userId}"] .message-author{color:${colorList[autoColorIndex++ % colorList.length]}}`;
             if (logWindow && !logWindow.closed)
-              logWindow.document.querySelector('head').append(style.cloneNode(true));
+              logWindow.document.head.append(style.cloneNode(true));
           }
           // 発言間隔秒数
           if (messageBody && user && experimentalConfig.spammer && experimentalConfig.displayMsgInterval && user.commentInterval && user.commentInterval !== Infinity) {
             var values = [user.commentInterval];
             if (user.commentIntervalAverage && user.commentIntervalAverage !== Infinity)
               values.push(user.commentIntervalAverage);
-            messageBody.innerHTML += ` (${values.map(v => (v + '').replace(/(\.\d)\d+$/, '$1')).join(' ')})`;
+            JSML(messageBody, 'append', [` (${values.map(v => (v + '').replace(/(\.\d)\d+$/, '$1')).join(' ')})`]);
           }
         }
         // ログ窓に書き出し
@@ -1833,7 +1888,11 @@ window.interval = setInterval(function () {
     if (SpeechRecognition) {
       var buttonContainer = createButtonContainer();
       buttonContainer.appendChild(textbox.previousSibling);
-      buttonContainer.innerHTML += '<br><input type="checkbox" id="enableSpeech" style="display:none"><button id="voiceButton" onclick="this.previousSibling.click()">' + text('音声', 'Voice') + '</button>'
+      JSML(buttonContainer, 'append', [
+        ['br'],
+        ['input', {type: 'checkbox', id: 'enableSpeech', style: 'display:none'}],
+        ['button', {type: 'checkbox', id: 'voiceButton', onclick: 'this.previousSibling.click()'}, text('音声', 'Voice')]
+      ]);
       textbox.before(buttonContainer);
       var enableSpeech = document.getElementById('enableSpeech');
       enableSpeech.onclick = function () {
@@ -1881,7 +1940,7 @@ window.interval = setInterval(function () {
     var logWindowButton = logButtons.appendChild(document.createElement('button'));
     logWindowButton.id = 'logWindowButton';
     logWindowButton.textContent = text('ログ窓', 'Log Window');
-    logWindowButton.onclick = function () {
+    logWindowButton.onclick = async function () {
       if (logWindow && !logWindow.closed) {
         logWindow.focus();
         return;
@@ -1891,12 +1950,24 @@ window.interval = setInterval(function () {
         asyncAlert(text('ポップアップを許可してください', 'Allow to popup'));
         return;
       }
-      logWindow.document.write(generateLogWindowHTML(
+      if (logWindow.document.readyState !== 'complete')
+        await new Promise(resolve => logWindow.onload = resolve);
+      writeLogWindowHTML(
+        logWindow.document,
         vueApp.$i18next.t('room.' + vueApp.currentRoom.id),
-        Array.from(document.querySelectorAll('style[id^=color]')).reduce((html, style) => html + style.outerHTML, ''),
+        Array.from(document.querySelectorAll('style[id^=color]')).map(element => ['style', {'class': 'tripColor', id: element.id}, element.textContent]),
         text('切断されたログ', 'Disconnected log')
-      ));
-      logWindow.onload = function () {
+      );
+      logWindow.onfocus = function () {
+        logWindow.document.body.lastElementChild.focus();
+      };
+      logWindow.onstorage = function () {
+        if (!this.closed)
+          logWindow.document.getElementById('log-style').textContent = experimentalConfig.logWindowCSS + (experimentalConfig.displayIcon ? characterLogCSS.textContent : '');
+      };
+      logWindow.onstorage();
+      logWindow._vueApp = window._vueApp;
+      (function onload() {
         var log = logWindow.document.importNode(document.getElementById('chatLog'), true);
         log.style.height = log.style.width = '';
         logWindow.document.body.firstElementChild.before(log);
@@ -1912,17 +1983,7 @@ window.interval = setInterval(function () {
           }
         };
         logWindow.document.body.lastElementChild.onkeydown = autoComplete.onkeydown;
-      };
-      logWindow.onfocus = function () {
-        logWindow.document.body.lastElementChild.focus();
-      };
-      logWindow.onstorage = function () {
-        if (!this.closed)
-          logWindow.document.getElementById('log-style').textContent = experimentalConfig.logWindowCSS + (experimentalConfig.displayIcon ? characterLogCSS.textContent : '');
-      };
-      logWindow.onstorage();
-      logWindow._vueApp = window._vueApp;
-      logWindow.document.close();
+      })();
     };
     addEventListener('unload', () => {
       if (logWindow && !logWindow.closed) {
@@ -1955,10 +2016,9 @@ window.interval = setInterval(function () {
     var configButton = logButtons.appendChild(document.createElement('button'));
     configButton.textContent = text('設定', 'Config');
     configButton.id = 'configButton';
-    configButton.onclick = function () {
+    configButton.onclick = async function () {
       if (configWindow && !configWindow.closed) {
         try {
-          configWindow.text();
           configWindow.focus();
           return;
         } catch (err) {}
@@ -1968,13 +2028,15 @@ window.interval = setInterval(function () {
         asyncAlert(text('ポップアップを許可してください', 'Allow to popup'));
         return;
       }
-      configWindow.document.write(generateConfigHTML(
+      if (configWindow.document.readyState !== 'complete')
+        await new Promise(resolve => configWindow.onload = resolve);
+      writeConfigHTML(
+        configWindow.document,
         text('スクリプトの設定', 'Experimental Config'),
         text(0, 1),
         generateConfigMenu(),
         experimentalConfig
-      ));
-      configWindow.document.close();
+      );
     };
     // カラーピッカー
     var colorPicker = logButtons.appendChild(document.createElement('input'));
@@ -2139,8 +2201,11 @@ window.interval = setInterval(function () {
       if (show) {
         var mutebtn = await querySelectorAsync('button.mute-unmute-button');
         if (!this.addAudio) {
-          this.addAudio = document.createElement('select');
-          this.addAudio.innerHTML = `<option>${text('配信音声の追加', 'Add voice')}<option value="browser">${text('ブラウザの音声', 'browser sound')}<option value="monitor">${text('PCの音声', 'speaker sound')}`;
+          JSML(this.addAudio = document.createElement('select'), 'append', [
+            ['option', text('配信音声の追加', 'Add voice')],
+            ['option', {value: 'browser'}, text('ブラウザの音声', 'browser sound')],
+            ['option', {value: 'monitor'}, text('PCの音声', 'speaker sound')],
+          ]);
           this.addAudio.style.display = 'block';
           this.addAudio.style.marginTop = '10px';
           this.addAudio.onchange = this.add;
@@ -2598,7 +2663,7 @@ window.interval = setInterval(function () {
   };
   // チェス棋譜
   var fens = [], pgnButton = document.createElement('button'), pgnWindow;
-  pgnButton.onclick = function () {
+  pgnButton.onclick = async function () {
     try {
       if (!pgnWindow || pgnWindow.closed)
         throw 1;
@@ -2611,9 +2676,9 @@ window.interval = setInterval(function () {
       asyncAlert(text('ポップアップを許可してください', 'Allow to popup'));
       return;
     }
-    pgnWindow.document.open();
-    pgnWindow.document.write(generateChessHTML(pgnButton.textContent, fens, text('分析', 'Analyze')));
-    pgnWindow.document.close();
+    if (pgnWindow.document.readyState !== 'complete')
+      await new Promise(resolve => pgnWindow.onload = resolve);
+    writeChessHTML(pgnWindow.document, pgnButton.textContent, fens, text('分析', 'Analyze'));
   };
   var getChessMovement = function () {
     if (fens.length < 2)

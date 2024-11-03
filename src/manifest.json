@@ -24,7 +24,8 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "{7999b995-3ab5-472b-9a1c-400f96573bfc}"
+      "id": "{7999b995-3ab5-472b-9a1c-400f96573bfc}",
+      "update_url": "https://iwamizawa-software.github.io/poipoi-extension/updates.json"
     }
   }
 }
