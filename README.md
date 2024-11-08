@@ -37,3 +37,5 @@
 ## 設定方法
 
 ![ログの下にボタンがあるのでそこから設定する](https://iwamizawa-software.github.io/poipoi-extension/config.png)
+
+## [クイズ機能を使う](https://iwamizawa-software.github.io/poipoi-extension/quiz.html)

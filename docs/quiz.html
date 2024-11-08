@@ -1,0 +1,58 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>クイズ機能を使う</title>
+<style>pre{background-color:#ddd;padding:1em;font-size:20px}</style>
+<body>
+<h1>クイズ機能を使う</h1>
+<p>以下の手順で利用できます。
+<ol>
+<li><button>このボタンを押してコードをコピー</button>
+<li>ギコっぽいぽいの画面でCtrl＋Shift＋Iを押す
+<li>コンソール (Console)タブを押してコードを張り付けてEnter
+<li>出てきたタブでクイズを設定し、設定が終わったら「設定を隠す」ボタンを押す
+<li>クイズのページを配信で画面共有する
+<li>スタートボタンを押す
+</ol>
+<h1>問題ファイル</h1>
+<p>問題ファイルは拡張子txtのテキストファイルで、以下のように半角カンマ区切りで書いてください。
+<p>表記揺れに対応できるように、複数の答えを追加できます。
+<pre>
+問題文,答え1,答え2,答え3・・・
+問題文,答え1,答え2,答え3・・・
+</pre>
+<p>以下はサンプルです。問題文に画像URLを入れると画像を表示します。YouTubeのURLを入れると音だけ再生されます。
+<p>URLを使った場合、読み込み失敗することがあるので、読み込んだ後にURLエラーチェックをしてください。
+<pre>
+またの名を「ルドルフの数」といい、算数の授業でも習うこの数字のことを漢字3文字でなんと言う？,円周率
+腎臓の機能不全のため、尿として排出されるべき成分が血中に溜まることによって起こる中毒症状は？,尿毒症
+どこの国旗でしょうか？https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Flag_of_Canada.svg/800px-Flag_of_Canada.svg.png,カナダ
+どこの国歌でしょうか？https://www.youtube.com/watch?v=UctriMuXYS0,中国,中華人民共和国
+どこの国歌でしょうか？https://youtu.be/k3IQC3HCg-w?t=4,ソ連,ソビエト
+</pre>
+<h2>４択問題にする</h2>
+<p>答えを↖↗↙↘のいずれかにすると４択問題になります。吹き出しのボタンを押して解答します。
+<p>問題文に\nを入れるとそこで改行されます。
+<pre>
+吹き出しのボタンで答えてください。\nパリが首都の国は？\n↖イギリス ↗フランス ↙イタリア ↘カナダ,↗
+吹き出しのボタンで答えてください。\nローマが首都の国は？\n↖イギリス ↗フランス ↙イタリア ↘カナダ,↙
+</pre>
+<p><a href="https://github.com/iwamizawa-software/experimental-poipoi/tree/main/docs/quiz-sample">ここにサンプルがあります</a>
+<script>
+var code = () => {
+  if (!window.quizWindow)
+    (async () => {
+      while (!_vueApp.socket)
+        await new Promise(r => setTimeout(r, 1000));
+      _vueApp.socket.onAny(function () {
+        if (window.quizWindow && !quizWindow.closed)
+          quizWindow.postMessage(Array.from(arguments), 'https://iwamizawa-software.github.io')
+      });
+    })();
+  window.quizWindow = open('https://iwamizawa-software.github.io/experimental-poipoi/quiz.html', JSON.stringify(Object.values(_vueApp.users).map(({id, name, character}) => ({id, name, characterId: character.characterName})))) || {closed: true};
+};
+document.querySelector('button').onclick = function () {
+  navigator.clipboard.writeText(`(${code})()`);
+  alert('コピーしました');
+};
+</script>
+</body>
