@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "Content-Security-Policy",
+          "operation": "set",
+          "value": "script-src 'self' 'unsafe-eval' 'sha256-AeWVvYlYnQSMVOwsvKkbaqOetfThVIDCU4hzrZ7NaP8=' 'sha256-Lc+AcGdq7u1+DBwiEIlPF8xvfWVPlNM2NBfgw7HYu8M=' 'sha256-iU8rm7O/CKXkXF2QwtavwCmDOpZ8auuGJmfjMmZyvck=';"
+        }
+      ]
+    },
+    "condition": {
+      "regexFilter": "/$|\\?",
+      "resourceTypes": ["main_frame", "sub_frame"]
+    }
+  }
+]

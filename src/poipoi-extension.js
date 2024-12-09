@@ -894,8 +894,9 @@
       ]],
       ['body']
     ]);
+    document.defaultView.args = JSON.stringify([langCode, configMenu, experimentalConfig]);
     JSML(document.head, 'append', [
-      ['script', `(${configScript})(${JSON.stringify(langCode)}, ${JSON.stringify(configMenu)}, ${JSON.stringify(experimentalConfig)})`]
+      ['script', `(${configScript})(...JSON.parse(args))`]
     ]);
   };
   var writeChessHTML = function (document, title, fens, linkText) {
@@ -963,11 +964,12 @@
         ]],
       ]]
     ]);
+    document.defaultView.args = JSON.stringify([fens]);
     JSML(document.head, 'append', [
-      ['script', `(${chessScript})(${JSON.stringify(fens)});`]
+      ['script', `(${chessScript})(...JSON.parse(args));`]
     ]);
   };
-  var writeLogWindowHTML = function (document, title, colorStyleJSML , disconnectMessage) {
+  var writeLogWindowHTML = function (document, title, colorStyleJSML, disconnectMessage) {
     var logWindowScript = function (disconnectMessage) {
       window.extension = true;
       window.interval = setInterval(function () {
@@ -979,6 +981,12 @@
           clearInterval(interval);
         }
       }, 10000);
+      document.addEventListener('click', function (event) {
+        if (event.target.tagName === 'A' && event.target.dataset.room) {
+          _vueApp.changeRoom(event.target.dataset.room);
+          event.preventDefault();
+        }
+      });
     };
     JSML(document.documentElement, 'clear', [
       ['head', [
@@ -997,8 +1005,9 @@ input{display:block;position:fixed;bottom:0;height:2em}
         ['input', {type: 'text', id: 'input-textbox'}]
       ]]
     ]);
+    document.defaultView.args = JSON.stringify([disconnectMessage]);
     JSML(document.head, 'append', [
-      ['script', `(${logWindowScript})(${JSON.stringify(disconnectMessage)});`]
+      ['script', `(${logWindowScript})(...JSON.parse(args));`]
     ]);
   };
 
@@ -1169,13 +1178,20 @@ input{display:block;position:fixed;bottom:0;height:2em}
         return;
       var a = document.createElement('a');
       a.text = m[2];
-      a.href = `javascript:void%20_vueApp.changeRoom('${roomNameToKey[a.text]}')`;
+      a.href = `javascript:void%200`;
+      a.dataset.room = roomNameToKey[a.text];
       var texts = node.nodeValue.split(a.text);
       element.replaceChild(a, node);
       a.before(texts.shift());
       a.after(texts.join(a.text));
     });
   };
+  document.addEventListener('click', function (event) {
+    if (event.target.tagName === 'A' && event.target.dataset.room) {
+      _vueApp.changeRoom(event.target.dataset.room);
+      event.preventDefault();
+    }
+  });
 
   var vueApp = window._vueApp = await ready(await ready(await ready(await ready(await ready(window, 'vueApp'), '_container'), '_vnode'), 'component'), 'proxy');
   vueApp.toDisplayName = name => name || vueApp.$i18next.t('default_user_name');
@@ -1902,7 +1918,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
       JSML(buttonContainer, 'append', [
         ['br'],
         ['input', {type: 'checkbox', id: 'enableSpeech', style: 'display:none'}],
-        ['button', {type: 'checkbox', id: 'voiceButton', onclick: 'this.previousSibling.click()'}, text('音声', 'Voice')]
+        ['button', {type: 'checkbox', id: 'voiceButton', onclick: function () {this.previousSibling.click()}}, text('音声', 'Voice')]
       ]);
       textbox.before(buttonContainer);
       var enableSpeech = document.getElementById('enableSpeech');

@@ -3,7 +3,7 @@
   "default_locale": "en_US",
   "name": "__MSG_extName__",
   "description": "__MSG_extDescription__",
-  "version": "90",
+  "version": "91",
   "author": "iwamizawa-software",
   "content_scripts": [
     {
@@ -17,6 +17,20 @@
       "world": "MAIN"
     }
   ],
+  "permissions": ["declarativeNetRequest"],
+  "host_permissions": [
+    "https://gikopoipoi.net/*",
+    "https://gikopoi.hu/*"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "csp",
+        "enabled": true,
+        "path": "csp.json"
+      }
+    ]
+  },
   "icons": {
     "16": "icon/icon16.png",
     "48": "icon/icon48.png",

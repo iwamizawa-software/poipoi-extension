@@ -30,6 +30,8 @@
 
 ### iPhone, iPadの場合
 
+注意：Orion Browserの拡張機能は自動更新機能がないので定期的に自分で入れなおしてください。
+
 1. [Orion Browserをインストール](https://apps.apple.com/jp/app/orion-browser-by-kagi/id1484498200)
 2. Orionを開いて拡張機能を有効にする<br>![Activate Nowを押す](https://iwamizawa-software.github.io/poipoi-extension/orion.png)
 3. [Orionからこのページを開いて追加する](https://chromewebstore.google.com/detail/%E3%81%BD%E3%81%84%E3%81%BD%E3%81%84%E6%8B%A1%E5%BC%B5/dchhhmhghoakioefjlajidbigkppfhbd?hl=ja)
