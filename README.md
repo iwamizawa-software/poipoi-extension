@@ -13,6 +13,7 @@
 ## 無効になった場合
 
 ![許可して再度有効にしてください](https://iwamizawa-software.github.io/poipoi-extension/enable.jpg)
+
 有効にする方法がわからなければいったん削除して入れなおせば直ります。
 
 ## インストール方法
