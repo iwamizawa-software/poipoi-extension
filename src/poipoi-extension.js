@@ -383,7 +383,7 @@
       },
       {
         key: 'mentionSound',
-        name: text('メンションが来たときに再生する音声ファイルのURL', 'Mention Sound URL'),
+        name: text('メンションが来たときに再生する音声ファイルのData URL', 'Mention Sound Data URL'),
         description: text('本家でも音を鳴らす設定にしている場合は２つ同時に鳴ります。', 'If you enable mention sound on poipoi and this script, two sounds are played.'),
         type: 'input',
         value: ''
@@ -548,6 +548,12 @@
         value: 0
       },
       {
+        key: 'errorLog',
+        name: text('エラーログを保持する行数', 'Lines of saving error log'),
+        type: 'input',
+        value: '3'
+      },
+      {
         key: 'useCookie',
         name: text('設定の保存場所', 'Config data location'),
         type: [
@@ -618,12 +624,6 @@
         name: 'Show color picker',
         type: 'onoff',
         value: 0
-      },
-      {
-        key: 'debugWebhook',
-        name: 'Webhook URL for debug',
-        type: 'input',
-        value: ''
       }
     ];
   };
@@ -1057,11 +1057,29 @@ input{display:block;position:fixed;bottom:0;height:2em}
       location.reload();
     };
   }
+  var downloadLink = document.createElement('a');
+  var downloadText = (text, fname) => {
+    URL.revokeObjectURL(downloadLink.href);
+    downloadLink.href = URL.createObjectURL(new Blob([text], {type: 'application/octet-stream'}));
+    downloadLink.download = fname;
+    downloadLink.click();
+  };
+  var errorLog = JSON.parse(localStorage.getItem('experimentalErrorLog')) || [];
   var consolelog = function () {
-    var log = Array.from(arguments).map(err => err.stack ? err.message + '\n' + err.stack : err).join('\n');
+    var log = Array.from(arguments)
+      .filter(err => err && !(err.constructor === Event && err.type === 'error' && err.target === null))
+      .map(err => err.stack ? err.message + '\n' + err.stack : err).join('\n');
+    if (!log)
+      return;
     console.log(log);
-    if (experimentalConfig?.debugWebhook?.startsWith('https://discord.com/api/webhooks/'))
-      fetch(experimentalConfig.debugWebhook, { method : 'POST', headers : {'Content-Type' : 'application/json'}, body : JSON.stringify({content : log})});
+    errorLog.push({
+      date: (new Date()).toLocaleString(),
+      room: vueApp.currentRoom?.id,
+      users: Object.values(vueApp.users || {}).map(({id, name, character, message}) => [id, character?.characterName, name, message].filter(Boolean)),
+      log
+    });
+    if (+experimentalConfig.errorLog)
+      localStorage.setItem('experimentalErrorLog', JSON.stringify(errorLog.slice(-experimentalConfig.errorLog)));
   };
   window.onunhandledrejection = event => { consolelog(event.reason);};
   Object.defineProperty(console, 'error', {
@@ -2029,17 +2047,13 @@ input{display:block;position:fixed;bottom:0;height:2em}
     var download = logButtons.appendChild(document.createElement('button'));
     download.id = 'saveButton';
     download.textContent = text('保存', 'Save');
-    var downloadLink = document.createElement('a');
     download.onclick = function () {
-      URL.revokeObjectURL(downloadLink.href);
       var log = document.getElementById('chatLog').innerText;
       if (!log)
         return;
-      downloadLink.href = URL.createObjectURL(new Blob([log.replace(/([^\r])\n/g, '$1\r\n')], {type: 'application/octet-stream'}));
       var opts = {year: 'numeric'};
       opts.month = opts.day = opts.hour = opts.minute = opts.second = '2-digit';
-      downloadLink.download = (new Date()).toLocaleString([], opts).replace(/\D/g, '') + '.txt';
-      downloadLink.click();
+      downloadText(log.replace(/([^\r])\n/g, '$1\r\n'), (new Date()).toLocaleString([], opts).replace(/\D/g, '') + '.txt');
     };
     // 設定
     var configButton = logButtons.appendChild(document.createElement('button'));
@@ -2662,6 +2676,10 @@ input{display:block;position:fixed;bottom:0;height:2em}
         return;
       } else if (t.value === '#ver') {
         t.value = VERSION;
+      } else if (t.value === '#error') {
+        downloadText(JSON.stringify(errorLog), 'error-log.txt');
+        t.value = '';
+        return;
       } else if (t.value === '#ikaoni') {
         if (vueApp.characterId === 'shar_naito' || vueApp.users[vueApp.myUserID].character?.characterName === 'ika')
           systemMessage('足の速いキャラとイカは出来ません。');
