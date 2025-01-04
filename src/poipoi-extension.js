@@ -384,7 +384,7 @@
       {
         key: 'mentionSound',
         name: text('メンションが来たときに再生する音声ファイルのData URL', 'Mention Sound Data URL'),
-        description: text('本家でも音を鳴らす設定にしている場合は２つ同時に鳴ります。', 'If you enable mention sound on poipoi and this script, two sounds are played.'),
+        description: text('本家でも音を鳴らす設定にしている場合は２つ同時に鳴ります。', 'If you enable mention sound on poipoi and this extension, two sounds are played.'),
         type: 'input',
         value: ''
       },
@@ -1032,7 +1032,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
     };
   }
   if (localStorage.getItem('disableScript')) {
-    disableButton.textContent = 'スクリプトを有効化 Enable script';
+    disableButton.textContent = '拡張機能を有効化 Enable extension';
     disableButton.style.background = '#5f5';
     disableButton.onclick = () => {
       localStorage.removeItem('disableScript');
@@ -1041,7 +1041,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
     var resetButton = document.createElement('button');
     resetButton.textContent = 'リセット Reset';
     resetButton.onclick = () => {
-      if (confirm('スクリプトの設定をリセットしますか？ Do you clear config of script?')) {
+      if (confirm('拡張機能の設定をリセットしますか？ Do you clear config of extension?')) {
         localStorage.removeItem('experimentalConfig');
         alert('リセットしました Done');
         disableButton.click();
@@ -1050,10 +1050,10 @@ input{display:block;position:fixed;bottom:0;height:2em}
     disableButton.after(resetButton);
     return;
   } else {
-    disableButton.textContent = 'バグったら押す Disable script';
+    disableButton.textContent = 'バグったら押す Disable extension';
     disableButton.onclick = () => {
       localStorage.setItem('disableScript', 'true');
-      alert('スクリプトが無効になりました。\nこれで治った場合スクリプトのバグなので報告お願いします。\nScript has been disabled.');
+      alert('拡張機能が無効になりました。\nこれで治った場合拡張機能のバグなので報告お願いします。\nExtension has been disabled.');
       location.reload();
     };
   }
@@ -2075,7 +2075,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
         await new Promise(resolve => configWindow.onload = resolve);
       writeConfigHTML(
         configWindow.document,
-        text('スクリプトの設定', 'Experimental Config'),
+        text('拡張機能の設定', 'Experimental Config'),
         text(0, 1),
         generateConfigMenu(),
         experimentalConfig
@@ -2617,7 +2617,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
     PLAY_MINUTES: 5
   };
   ikaoni.waiting = () => (new Date()).getTime() - ikaoni.lastPlayTime < ikaoni.WAIT_SECONDS * 1000;
-  ikaoni.MASTER_WORD = 'いかおにをする人は' + ikaoni.WAIT_SECONDS + '秒以内に「いかおに」と発言してください。(スクリプトが必要)';
+  ikaoni.MASTER_WORD = 'いかおにをする人は' + ikaoni.WAIT_SECONDS + '秒以内に「いかおに」と発言してください。(拡張機能が必要)';
   ikaoni.start = master => {
     ikaoni.playing = true;
     clearTimeout(ikaoni.timerId);
