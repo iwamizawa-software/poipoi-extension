@@ -2670,6 +2670,11 @@ input{display:block;position:fixed;bottom:0;height:2em}
         vueApp.socket.emit('user-block', t.value.slice(7));
         t.value = '';
         return;
+      } else if (t.value.startsWith('#select ')) {
+        var id = t.value.slice(8);
+        vueApp.highlightUser(id, id);
+        t.value = '';
+        return;
       } else if (t.value === '#config') {
         document.getElementById('configButton')?.click();
         t.value = '';
