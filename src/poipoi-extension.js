@@ -4,7 +4,7 @@
     return;
   window.extension = true;
 
-  var VERSION = 88;
+  var VERSION = 93;
   var innerJSML = element => Array.from(element.childNodes).map(node => {
     if (node.tagName) {
       var attrs = {};
@@ -182,7 +182,8 @@
         key: 'autoColorList',
         name: text('自動ログ色リスト', 'Palette of auto colored log'),
         description: text('自動色分けで使う色をカラーコードで指定します。', 'Set hex colors for auto colored log.'),
-        type: 'color',
+        type: 'list',
+        option: 'color',
         value: ['#ff8000', '#008000', '#0080ff', '#8060ff', '#ff60ff']
       },
       {
@@ -510,6 +511,60 @@
         value: 'body{margin:0;padding:0;width:100%;height:100%;border:1px solid #000;box-sizing:border-box;background:#fff}.log{position:fixed;bottom:1px;width:100%}p{margin:0;padding:2px;font-size:0.8em;border-top:1px solid #000;word-break:break-all}.ihash{display:none}'
       },
       {
+        name: text('コントローラー (ゲームパッド)', 'Gamepad'),
+        type: 'separator'
+      },
+      {
+        key: 'enableGamepad',
+        name: text('ゲームパッドを有効にする', 'Enable gamepad'),
+        type: 'onoff',
+        value: 1,
+        relations: ['enableVibration', 'swapGamepadButton', 'gamepadDeadzone', 'gamepadLayout']
+      },
+      {
+        key: 'enableVibration',
+        name: text('振動を有効にする', 'Enable vibration'),
+        type: 'onoff',
+        value: 1
+      },
+      {
+        key: 'swapGamepadButton',
+        name: text('決定ボタンとキャンセルボタンを入れ替える', 'Swap OK with Cancel'),
+        type: 'onoff',
+        value: 0
+      },
+      {
+        key: 'gamepadDeadzone',
+        name: text('アナログスティックのデッドゾーン (0.0～1.0)', 'Stick dead zone (0.0～1.0)'),
+        type: 'input',
+        value: '0.5'
+      },
+      {
+        key: 'gamepadLayout',
+        name: text('ボタン配置', 'Gamepad layout'),
+        description: text('ボタンを長押しすると対応した箇所の色が変わります。 (現在使えるコマンド：cancel, ok, rula, mic, recieve, list, stream, henshin, up, down, left, right)', 'Press and hold to change color. (Available commands: cancel, ok, rula, mic, recieve, list, stream, henshin, up, down, left, right)'),
+        type: 'list',
+        option: 'layout',
+        value: [
+          'cancel',
+          'ok',
+          'rula',
+          'mic',
+          'recieve',
+          'list',
+          'stream',
+          'henshin',
+          '',
+          '',
+          '',
+          '',
+          'up',
+          'down',
+          'left',
+          'right'
+        ]
+      },
+      {
         name: text('その他', 'Others'),
         type: 'separator'
       },
@@ -632,6 +687,20 @@
       window.extension = true;
       var text = function () {return arguments[langCode]};
       var currentValue = {};
+      var setOptions = (select, values, opt, index = null) => {
+        if (index === null)
+          select.textContent = '';
+        values?.forEach?.(value => {
+          var option = document.createElement('option');
+          select.add(option, index);
+          option.text = value;
+          if (opt === 'color') {
+            option.style.color = value;
+            option.style.fontWeight = 'bold';
+          }
+        });
+        return values;
+      };
       window.load = function (obj) {
         try {
           if (typeof obj === 'string')
@@ -651,17 +720,8 @@
             case 'input':
               element.value = value;
               break;
-            case 'color':
             case 'list':
-              element.textContent = '';
-              value?.forEach?.(value => {
-                var option = element.appendChild(document.createElement('option'));
-                option.text = value;
-                if (item.type === 'color') {
-                  option.style.color = value;
-                  option.style.fontWeight = 'bold';
-                }
-              });
+              setOptions(element, value, item.option);
               break;
             default:
               if (item.type?.constructor === Array) {
@@ -801,7 +861,6 @@
               }
             });
             break;
-          case 'color':
           case 'list':
             append('h2', item.key).textContent = item.name;
             if (item.description)
@@ -828,21 +887,18 @@
                     return;
                   }
                 }
-                var option = select.insertBefore(document.createElement('option'), select.firstChild);
-                option.text = addText.value;
-                if (item.type === 'color') {
-                  option.style.color = addText.value;
-                  option.style.fontWeight = 'bold';
-                }
+                setOptions(select, [addText.value], item.option, select.selectedIndex === -1 ? 0 : select.selectedIndex);
                 addText.value = '';
-                update(item.key, Array.from(select.options).map(option => option.value));
+                update(item.key, Array.from(select.options).map(option => option.text));
               }
             });
             append('br', item.key);
             var select = append('select', item.key, {
               id: item.key,
-              size: 6
+              size: item.option === 'layout' ? 16 : 6
             });
+            if (item.option)
+              select.className = item.option;
             select.setAttribute('style', 'width:20em;box-sizing:border-box');
             append('input', item.key, {
               type: 'button',
@@ -851,9 +907,18 @@
                 var i = select.selectedIndex;
                 select.remove(i);
                 select.selectedIndex = Math.min(i, select.options.length - 1);
-                update(item.key, Array.from(select.options).map(option => option.value));
+                update(item.key, Array.from(select.options).map(option => option.text));
               }
             });
+            if (item.option)
+              append('input', item.key, {
+                type: 'button',
+                value: 'Reset',
+                onclick: function () {
+                  if (confirm(text('初期値に戻しますか？', 'Do you set default value?')))
+                    update(item.key, setOptions(select, item.value, item.option));
+                }
+              });
             break;
           case 'onoff':
             item.type = ['OFF', 'ON'];
@@ -883,14 +948,50 @@
         defaultValue[item.key] = item.value;
       });
       load(defaultValue);
-      document.head.appendChild(document.createElement('style')).textContent = 'h1{color:#06f;cursor:pointer;text-decoration:underline;margin:0;padding:10px 0}.hide{display:none}label{padding:10px;display:inline-block}input[type=button]{padding-left:30px;padding-right:30px;}';
       Array.from(document.getElementsByTagName('h1')).forEach(h1 => h1.click());
       load(experimentalConfig);
+      setInterval(() => {
+        var layout = document.querySelector('.layout');
+        navigator.getGamepads().reduce((accumulator, gp) => gp?.buttons.forEach((b, i) => accumulator[i] ||= b.pressed) || accumulator, []).forEach((pressed, i) => {
+          if (layout.options[i] && (layout.options[i].className === 'pressed') !== pressed)
+            layout.options[i].className = pressed ? 'pressed' : '';
+        });
+      }, 1000);
     };
     JSML(document.documentElement, 'clear', [
       ['head', [
         ['title', title],
-        ['meta', {name: 'viewport', content: 'width=device-width, initial-scale=1.0'}]
+        ['meta', {name: 'viewport', content: 'width=device-width, initial-scale=1.0'}],
+        ['style', `
+          h1{
+            color: #06f;
+            cursor: pointer;
+            text-decoration: underline;
+            margin: 0;
+            padding: 10px 0;
+          }
+          .hide{
+            display:none;
+          }
+          label{
+            padding: 10px;
+            display: inline-block;
+          }
+          input[type=button]{
+            padding-left: 30px;
+            padding-right: 30px;
+          }
+          select.layout option:first-child{
+            counter-reset: number -1;
+          }
+          select.layout option:before{
+            counter-increment: number;
+            content:counter(number) ". ";
+          }
+          option.pressed{
+            background-color: #afa;
+          }
+        `]
       ]],
       ['body']
     ]);
@@ -1328,12 +1429,252 @@ input{display:block;position:fixed;bottom:0;height:2em}
         loadCharacterIcon(name, true);
       };
   };
-  // userscript CSS
-  document.head.appendChild(document.createElement('style')).textContent = '#chat-log-label{display:none}#chat-log-container{flex-direction:column}#enableSpeech:checked+button{background-color:#9f6161}.inactive-message:before{opacity:0.5}';
+  // Gamepad
+  var gamepad = (function () {
+    var gamepads = [], enabled;
+    var lastVibrate = 0;
+    var self = {
+      settings: {
+        buttonRepeatDelay: 500,
+        buttonRepeatRate: 100,
+        repeatable: [12, 13, 14, 15],
+        deadzone: 0.5,
+        axisRepeatRate: 50,
+        vibrationRate: 1000,
+        repeatableAxes: [0]
+      },
+      enable: value => {
+        if (enabled = value)
+          startLoop();
+        else
+          stopLoop();
+      },
+      vibrate: () => {
+        if (!enabled || self.settings.disableVibration)
+          return;
+        var t = performance.now();
+        if (t - lastVibrate < self.settings.vibrationRate)
+          return;
+        lastVibrate = t;
+        try{
+          gamepads.forEach(gp => {
+            if (!gp?.connected)
+              return;
+            if (gp.hapticActuators)
+              gp.hapticActuators.forEach(a => a.pulse?.(0.5, 10));
+            else
+              gp.vibrationActuator?.playEffect?.('dual-rumble', {
+                startDelay: 0,
+                duration: 100,
+                strongMagnitude: 0.5,
+              });
+          });
+        } catch (err) {
+          consolelog(err);
+        }
+      }
+    };
+    var gamepadsStatus = {};
+    var requestId, startLoop = () => {
+      cancelAnimationFrame(requestId);
+      requestId = requestAnimationFrame(function f(t) {
+        if ((gamepads = navigator.getGamepads()).map((gp, gamepadIndex) => {
+          if (!gp)
+            return;
+          if (!gp.connected) {
+            delete gamepads[gamepadIndex];
+            return;
+          }
+          var buttonsStatus = (gamepadsStatus[gamepadIndex] || (gamepadsStatus[gamepadIndex] = {buttons: {}, axes: {}})).buttons;
+          gp.buttons.forEach(({pressed: value}, buttonIndex) => {
+            var button = buttonsStatus[buttonIndex] || (buttonsStatus[buttonIndex] = {});
+            if (value && (!button.value || (self.settings.repeatable.includes(buttonIndex) && t - button.t > self.settings[button.repeat ? 'buttonRepeatRate' : 'buttonRepeatDelay']))) {
+              button.t = t;
+              button.repeat = button.value;
+              self.onGamepadPress?.(buttonIndex);
+            }
+            button.value = value;
+          });
+          var axesStatus = gamepadsStatus[gamepadIndex].axes;
+          for (var i = 0; i < gp.axes.length; i += 2) {
+            var prev = axesStatus[i] || (axesStatus[i] = {t: 0});
+            var value = Math.pow(gp.axes[i], 2) + Math.pow(gp.axes[i + 1], 2) > Math.pow(self.settings.deadzone, 2)
+              && ['left', 'up', 'down', 'right'][(gp.axes[i] > 0) + ((gp.axes[i + 1] > 0) << 1)];
+            var index = i >> 1;
+            if (value && (self.settings.repeatableAxes.includes(index) ? t - prev.t > self.settings.axisRepeatRate : prev.value !== value)) {
+              prev.t = t;
+              self.onGamepadMove?.(index, value);
+            }
+            prev.value = value;
+          }
+          return true;
+        }).includes(true))
+          requestId = requestAnimationFrame(f);
+      });
+    };
+    var stopLoop = () => cancelAnimationFrame(requestId);
+    addEventListener('gamepadconnected', e => {
+      gamepads[e.gamepad.index] = e.gamepad;
+      console.log('gamepad connected: ' + e.gamepad.index);
+      if (enabled)
+        startLoop();
+    });
+    addEventListener('gamepaddisconnected', e => {
+      delete gamepads[e.gamepad.index];
+      console.log('gamepad disconnected: ' + e.gamepad.index);
+    });
+    return self;
+  })();
+  var nextRect = (rects, {left, top, right, bottom}) => {
+    if (!rects?.length)
+      return;
+    var nearest = Infinity;
+    var candidate, head;
+    rects.forEach(rect => {
+      if (!head || head.top > rect.top)
+        head = rect;
+      if (rect.top < bottom - 1)
+        return;
+      var distance = (rect.right >= left && rect.left <= right ? 0 : Math.pow(rect.left > left ? rect.left - right : left - rect.right, 2)) + Math.pow(rect.top - bottom, 2);
+      if (nearest > distance) {
+        nearest = distance;
+        candidate = rect;
+      }
+    });
+    return candidate || head;
+  };
+  var removeUnavailableElements = elements => elements.filter(e => e.checkVisibility({contentVisibilityAuto: true, opacityProperty: true, visibilityProperty: true})
+    && (!e.htmlFor || document.getElementById(e.htmlFor)?.tagName === 'INPUT')
+  );
+  var getCursoredElement = elements => {
+    if (!elements.length)
+      return;
+    var current = document.querySelector('[data-gamepad-cursor]');
+    if (!current || !elements.includes(current)) {
+      removeGamepadCursor();
+      elements[0].setAttribute('data-gamepad-cursor', '');
+      elements[0].scrollIntoView({block: 'nearest', inline: 'nearest'});
+      return;
+    }
+    return current;
+  };
+  var moveGamepadCursor = (elements, direction) => {
+    var current = getCursoredElement(elements);
+    if (!current)
+      return;
+    current.removeAttribute('data-gamepad-cursor');
+    var currentRect;
+    var next = nextRect(elements.map(element => {
+      var rect = element.getBoundingClientRect();
+      rect = direction === 'left' ? {left: -rect.bottom, top: -rect.right, right: -rect.top, bottom: -rect.left}
+        : direction === 'right' ? {left: -rect.bottom, top: rect.left, right: -rect.top, bottom: rect.right}
+        : direction === 'up' ? {left: rect.left, top: -rect.bottom, right: rect.right, bottom: -rect.top}
+        : {left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom}
+      rect.element = element;
+      if (element === current)
+        currentRect = rect;
+      return rect;
+    }), currentRect)?.element;
+    next.setAttribute('data-gamepad-cursor', '');
+    next.scrollIntoView({block: 'nearest', inline: 'nearest'});
+  };
+  var removeGamepadCursor = () => Array.from(document.querySelectorAll('[data-gamepad-cursor]')).forEach(e => e.removeAttribute('data-gamepad-cursor'));
+  var clickCursoredElement = elements => {
+    var current = getCursoredElement(elements) || (elements.length <= 2 && elements.find(e => e.textContent === 'OK'));
+    if (!current)
+      return;
+    if (current?.htmlFor)
+      current = document.getElementById(current.htmlFor);
+    current?.click();
+  };
+  var getCursorableElements = () => Array.from(
+    (
+      Array.from(document.querySelectorAll('.popup-overlay+.popup')).sort((a, b) => +getComputedStyle(a).zIndex < +getComputedStyle(b).zIndex ? 1 : -1)[0]
+      || document
+    ).querySelectorAll('button:not(#infobox-button),label[for]')
+  ).filter(e => e.checkVisibility({contentVisibilityAuto: true, opacityProperty: true, visibilityProperty: true})
+    && (!e.htmlFor || ['checkbox', 'radio'].includes(document.getElementById(e.htmlFor)?.type))
+  );
+  var getTopOverlay = () => Array.from(document.querySelectorAll('.popup-overlay')).sort((a, b) => +getComputedStyle(a).zIndex < +getComputedStyle(b).zIndex ? 1 : -1)[0];
+  var gamepadLayout = [];
+  gamepad.onGamepadPress = index => {
+    if (document.getElementById('logged-out-page'))
+      location.reload();
+    var command = gamepadLayout[index];
+    if (!command)
+      return;
+    switch (command) {
+      case 'cancel':
+        var overlay = getTopOverlay();
+        if (overlay)
+          overlay.click();
+        else
+          removeGamepadCursor();
+        break;
+      case 'ok':
+        if (document.getElementById('rula-popup'))
+          vueApp.handleRulaPopupKeydown({code: 'Enter'});
+        else
+          clickCursoredElement(getCursorableElements());
+        break;
+      case 'rula':
+        if (document.getElementById('rula-popup'))
+          document.querySelector('.popup-overlay')?.click();
+        else if (!document.querySelector('.popup-overlay') && document.getElementById('input-textbox'))
+          vueApp.requestRoomList();
+        break;
+      case 'mic':
+        document.getElementById('voiceButton')?.click();
+        break;
+      case 'list':
+        if (document.getElementById('user-list-popup'))
+          document.querySelector('.popup-overlay')?.click();
+        else if (!document.querySelector('.popup-overlay') && document.getElementById('input-textbox'))
+          vueApp.openUserListPopup();
+        break;
+      case 'henshin':
+        vueApp.socket?.emit('user-msg', '#henshin');
+        break;
+      case 'recieve':
+        if (document.querySelector('.popup-overlay'))
+          break;
+        var recieveButtons = Array.from(document.querySelectorAll('[id^=take-stream-button-]'));
+        if (recieveButtons.length)
+          recieveButtons.forEach(b => b.click());
+        else
+          Array.from(document.querySelectorAll('[id^=drop-stream-button-]')).forEach(b => b.click());
+        break;
+      case 'stream':
+        if (document.getElementById('stream-popup')) {
+          getTopOverlay()?.click();
+          break;
+        }
+        if (document.querySelector('.popup-overlay'))
+          break;
+        var streamButton = document.querySelector('[id^=start-video-streaming-button-]');
+        if (streamButton)
+          streamButton.click();
+        else
+          Array.from(document.querySelectorAll('[id^=stop-streaming-button-]')).forEach(b => b.click());
+        break;
+      case 'up':
+      case 'down':
+      case 'left':
+      case 'right':
+        if (document.getElementById('rula-popup'))
+          vueApp.handleRulaPopupKeydown({code: 'Arrow' + command[0].toUpperCase() + command.slice(1)});
+        else
+          moveGamepadCursor(getCursorableElements(), command);
+        break;
+    }
+  };
+  gamepad.onGamepadMove = (index, direction) => vueApp.socket && !document.querySelector('.popup-overlay') && vueApp[index ? 'sendNewBubblePositionToServer' : 'sendNewPositionToServer'](direction);
+  // extension CSS
+  document.head.appendChild(document.createElement('style')).textContent = '#chat-log-label{display:none}#chat-log-container{flex-direction:column}#enableSpeech:checked+button{background-color:#9f6161}.inactive-message:before{opacity:0.5}[data-gamepad-cursor]{border:3px solid red !important}';
   // config
   var userCSS = document.head.appendChild(document.createElement('style')), mentionSound, experimentalConfig;
   var vnCSS = document.head.appendChild(document.createElement('style'));
-  var apply = function () {
+  var applyConfig = function () {
     userCSS.textContent = experimentalConfig.userCSS || '';
     vnCSS.textContent = (experimentalConfig.vtuberNiconico & 1 ? '.vtuber-character{display:none}' : '') +
                         (experimentalConfig.vtuberNiconico & 2 ? '.nico-nico-messages-container{display:none}' : '') +
@@ -1360,6 +1701,16 @@ input{display:block;position:fixed;bottom:0;height:2em}
       mentionSound.volume = experimentalConfig.mentionVolume || 1;
     if (experimentalConfig.stopBack)
       history.pushState(null, null);
+    if (experimentalConfig.gamepadDeadzone)
+      gamepad.settings.deadzone = +experimentalConfig.gamepadDeadzone;
+    gamepad.settings.disableVibration = !experimentalConfig.enableVibration;
+    gamepad.settings.repeatable = [];
+    gamepadLayout = experimentalConfig.gamepadLayout.map((command, index) => {
+      if (['left', 'up', 'down', 'right'].includes(command))
+        gamepad.settings.repeatable.push(index);
+      return (experimentalConfig.swapGamepadButton && {ok: 'cancel', cancel: 'ok'}[command]) || command;
+    });
+    gamepad.enable(experimentalConfig.enableGamepad);
     widget?.paint();
   };
   window.modifyConfig = function (obj, mainWindow) {
@@ -1373,7 +1724,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
     experimentalConfig = JSON.parse(json);
     if (mainWindow)
       configWindow?.load?.(experimentalConfig);
-    apply();
+    applyConfig();
   };
   var configText = document.cookie.match(/experimentalConfig=([^;]+)/);
   experimentalConfig = Object.assign(Object.fromEntries(generateConfigMenu().map(({key, value}) => [key, value])), JSON.parse(configText?.[1] ? decodeURIComponent(configText[1]) : localStorage.getItem('experimentalConfig')));
@@ -1381,7 +1732,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
     if (experimentalConfig[key] && experimentalConfig[key].constructor !== Array)
       experimentalConfig[key] = experimentalConfig[key].split?.(',') || [experimentalConfig[key] + ''];
   });
-  apply();
+  applyConfig();
   Array.from(document.querySelectorAll('#character-selection label')).forEach(label => label.setAttribute('style', 'font-size:0'));
   var isAnon = name => (new RegExp('^(?:' + vueApp.toDisplayName('') + '\\d*)?$')).test(name);
   var isMention = msg => vueApp.checkIfMentioned?.(msg);
@@ -2836,6 +3187,10 @@ input{display:block;position:fixed;bottom:0;height:2em}
   var streamStates = [];
   var socketEvent = function (eventName) {
     switch (eventName) {
+      case 'server-character-changed':
+        if (arguments[1] === vueApp.myUserID)
+          gamepad.vibrate();
+        break;
       case 'server-move':
         var dto = arguments[1], user = vueApp.users[dto.userId];
         // グラフ
@@ -2852,6 +3207,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
         vueApp.route.add(graph.escape(dto?.userId === vueApp.myUserID ? dto : {x: myself?.logicalPositionX, y: myself?.logicalPositionY, direction: myself?.direction}, experimentalConfig.escape === 2));
         break;
       case 'server-reject-movement':
+        gamepad.vibrate();
         vueApp.route.next();
         break;
       case 'server-user-joined-room':
