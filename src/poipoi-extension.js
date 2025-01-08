@@ -71,10 +71,16 @@
         value: 0
       },
       {
+        key: 'confirmURLShortening',
+        name: text('長いURLを貼った時に短縮するか聞く', 'Confirm URL shortening'),
+        type: 'onoff',
+        value: 1
+      },
+      {
         key: 'shortenerTimeout',
         name: text('長いURLを貼った時にURL短縮処理を待つ秒数', 'Waiting time for shortening URL (seconds)'),
         type: 'input',
-        value: '2'
+        value: '3'
       },
       {
         key: 'autoComplete',
@@ -1167,20 +1173,24 @@ input{display:block;position:fixed;bottom:0;height:2em}
   };
   var errorLog = JSON.parse(localStorage.getItem('experimentalErrorLog')) || [];
   var consolelog = function () {
-    var log = Array.from(arguments)
-      .filter(err => err && !(err.constructor === Event && err.type === 'error' && err.target === null))
-      .map(err => err.stack ? err.message + '\n' + err.stack : err).join('\n');
-    if (!log)
-      return;
-    console.log(log);
-    errorLog.push({
-      date: (new Date()).toLocaleString(),
-      room: vueApp.currentRoom?.id,
-      users: Object.values(vueApp.users || {}).map(({id, name, character, message}) => [id, character?.characterName, name, message].filter(Boolean)),
-      log
-    });
-    if (+experimentalConfig.errorLog)
-      localStorage.setItem('experimentalErrorLog', JSON.stringify(errorLog.slice(-experimentalConfig.errorLog)));
+    try {
+      var log = Array.from(arguments)
+        .filter(err => err && !(err.constructor === Event && err.type === 'error' && err.target === null))
+        .map(err => err.stack ? err.message + '\n' + err.stack : err).join('\n');
+      if (!log)
+        return;
+      console.log(log);
+      errorLog.push({
+        date: (new Date()).toLocaleString(),
+        room: vueApp.currentRoom?.id,
+        users: Object.values(vueApp.users || {}).map(({id, name, character, message}) => [id, character?.characterName, name, message].filter(Boolean)),
+        log
+      });
+      if (+experimentalConfig.errorLog)
+        localStorage.setItem('experimentalErrorLog', JSON.stringify(errorLog.slice(-experimentalConfig.errorLog)));
+    } catch (err) {
+      console.log(err);
+    }
   };
   window.onunhandledrejection = event => { consolelog(event.reason);};
   Object.defineProperty(console, 'error', {
@@ -1370,6 +1380,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
   };
   // Mozilla 誤検出対策
   var asyncAlert = text => new Promise(resolve => vueApp['openDialog'](text, '', ['OK'], 0, resolve));
+  var asyncConfirm = t => new Promise(resolve => vueApp.confirm(t, () => resolve(true), () => resolve(false)));
   var createButtonContainer = function () {
     var fakePopup = document.createElement('div');
     fakePopup.className = 'popup';
@@ -1491,19 +1502,24 @@ input{display:block;position:fixed;bottom:0;height:2em}
             if (value && (!button.value || (self.settings.repeatable.includes(buttonIndex) && t - button.t > self.settings[button.repeat ? 'buttonRepeatRate' : 'buttonRepeatDelay']))) {
               button.t = t;
               button.repeat = button.value;
-              self.onGamepadPress?.(buttonIndex);
+              self.onGamepadPress(buttonIndex);
             }
             button.value = value;
           });
           var axesStatus = gamepadsStatus[gamepadIndex].axes;
           for (var i = 0; i < gp.axes.length; i += 2) {
-            var prev = axesStatus[i] || (axesStatus[i] = {t: 0});
+            var prev = axesStatus[i] || (axesStatus[i] = {t: 0, d: 0});
             var value = Math.pow(gp.axes[i], 2) + Math.pow(gp.axes[i + 1], 2) > Math.pow(self.settings.deadzone, 2)
               && ['left', 'up', 'down', 'right'][(gp.axes[i] > 0) + ((gp.axes[i + 1] > 0) << 1)];
             var index = i >> 1;
             if (value && (self.settings.repeatableAxes.includes(index) ? t - prev.t > self.settings.axisRepeatRate : prev.value !== value)) {
               prev.t = t;
-              self.onGamepadMove?.(index, value);
+              self.onGamepadMove(index, value);
+            }
+            if (value && (!prev.value || t - prev.d > self.settings[prev.repeat ? 'buttonRepeatRate' : 'buttonRepeatDelay'])) {
+              prev.d = t;
+              prev.repeat = prev.value;
+              self.onGamepadMoveAsDPad(index, gp.axes[i], gp.axes[i + 1]);
             }
             prev.value = value;
           }
@@ -1669,6 +1685,14 @@ input{display:block;position:fixed;bottom:0;height:2em}
     }
   };
   gamepad.onGamepadMove = (index, direction) => vueApp.socket && !document.querySelector('.popup-overlay') && vueApp[index ? 'sendNewBubblePositionToServer' : 'sendNewPositionToServer'](direction);
+  gamepad.onGamepadMoveAsDPad = (index, x, y) => {
+    if (!(document.querySelector('.popup-overlay') || document.getElementById('login-button')) || index !== 0)
+      return;
+    if (document.getElementById('rula-popup'))
+      vueApp.handleRulaPopupKeydown({code: y > 0 ? 'ArrowDown' : 'ArrowUp'});
+    else
+      moveGamepadCursor(getCursorableElements(), ['left', 'up', 'down', 'right'][(x - y > 0) + ((x + y > 0) << 1)]);
+  };
   // extension CSS
   document.head.appendChild(document.createElement('style')).textContent = '#chat-log-label{display:none}#chat-log-container{flex-direction:column}#enableSpeech:checked+button{background-color:#9f6161}.inactive-message:before{opacity:0.5}[data-gamepad-cursor]{border:3px solid red !important}';
   // config
@@ -1872,17 +1896,17 @@ input{display:block;position:fixed;bottom:0;height:2em}
   console.log('injected');
   // 入室時
   var updateRoomState = vueApp.updateRoomState;
-  var lastRoomName, henshined, bubbleChanged;
+  var henshined, bubbleChanged;
   vueApp.updateRoomState = async function (dto) {
+    var roomIsChanged = dto.currentRoom?.id !== vueApp.currentRoom?.id;
     // 部屋背景色変更
     if (experimentalConfig.roomColor)
       dto.currentRoom.backgroundColor = experimentalConfig.roomColor;
     // 部屋名をログ出力
     var roomName = vueApp.$i18next.t('room.' + dto?.currentRoom?.id);
     var numberOfUsers = (dto.connectedUsers.some(u => u.id === vueApp.myUserID) ? 0 : 1) + dto.connectedUsers.length;
-    if (experimentalConfig.logRoomName && lastRoomName !== roomName)
+    if (experimentalConfig.logRoomName && roomIsChanged)
       systemMessage(text(`${roomName}に入室 (${numberOfUsers}人)`, `Entered to  ${roomName} (${numberOfUsers} users)`));
-    lastRoomName = roomName;
     // 入室時吹き出しを読み上げない
     var enableTTS = vueApp.enableTextToSpeech;
     vueApp.enableTextToSpeech = false;
@@ -1911,7 +1935,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
       bubbleChanged = true;
     }
     // グラフ
-    graph = new Graph(dto);
+    graph = new Graph(dto, !roomIsChanged && graph?.moved);
     return r;
   };
   // 無視解除時
@@ -2026,7 +2050,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
       if (video)
         video.style.transform = 'rotate(' + (video.dataset.rotate = (+(video.dataset.rotate || 0) + 90) % 360) + 'deg)';
     // 経路移動中止
-    } else if (event.key === 'Escape' || !event.key.indexOf('Arrow')) {
+    } else if (event.key === 'Escape') {
       vueApp.route.clear();
     }
     // 名前補完
@@ -2269,7 +2293,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
         if (writeLogToWindow)
           writeLogToWindow(aChild);
       } catch (err) {
-        console.log(err);
+        consolelog(err);
       }
     }
     return Node.prototype.appendChild.call(this, aChild);
@@ -2576,7 +2600,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
       });
     } catch (err) {
       asyncAlert(text('ミュートでエラーが発生した', 'failed to mute'));
-      console.log(err);
+      consolelog(err);
     }
     return mute.apply(this, arguments);
   };
@@ -2655,7 +2679,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
         }
       } catch (err) {
         asyncAlert(text('音声が取得できなかった', 'Audio track not found'));
-        console.log(err);
+        consolelog(err);
         return;
       }
       if (!vueApp.outboundAudioProcessor) {
@@ -2706,7 +2730,8 @@ input{display:block;position:fixed;bottom:0;height:2em}
     }
   };
   // グラフ
-  var graph, Graph = function ({currentRoom, connectedUsers}) {
+  var graph, Graph = function ({currentRoom, connectedUsers}, moved) {
+    this.moved = moved;
     this.nodes = JSON.parse('[' + ('[' + '{},'.repeat(currentRoom.size.x).slice(0, -1) + '],').repeat(currentRoom.size.y).slice(0, -1) + ']');
     this.room = currentRoom.id;
     currentRoom.blocked.forEach(({x, y}) => this.nodes[y][x] = null);
@@ -2761,7 +2786,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
     for (var id in currentRoom.doors) {
       var door = currentRoom.doors[id];
       if (this.nodes[door.y]?.[door.x])
-        this.nodes[door.y][door.x].door = {id, direction: door.direction};
+        this.nodes[door.y][door.x].door = {id, direction: door.direction, target: door.target};
     }
   };
   Graph.prototype.update = function (userId, xFrom, yFrom, xTo, yTo) {
@@ -2813,7 +2838,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
   };
   Graph.prototype.escape = function ({x, y, direction}, far) {
     var currentNode = this.nodes[y]?.[x];
-    if (!currentNode || currentNode.users.size < 2)
+    if (!currentNode || currentNode.users.size < 2 || currentNode.door?.target)
       return;
     // いかおに
     if (ikaoni.playing && !ikaoni.ikaed) {
@@ -2847,7 +2872,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
         break;
     }
     flag[0] = false;
-    return Array.from(candidate.length ? candidate[Math.random() * candidate.length | 0] : second[Math.random() * second.length | 0]);
+    return Array.from((candidate.length ? candidate[Math.random() * candidate.length | 0] : second[Math.random() * second.length | 0]) || []);
   };
   // ダブルクリックで移動
   var physicalToLogical = function (x, y) {
@@ -2859,77 +2884,91 @@ input{display:block;position:fixed;bottom:0;height:2em}
   };
   document.addEventListener('dblclick', event => {
     var devicePixelRatio = experimentalConfig.disablePixelRatio ? 1 : window.devicePixelRatio;
-    if (event.target.id === 'room-canvas' && !experimentalConfig.disableMove && !ikaoni.playing) {
+    if (event.target.id === 'room-canvas' && !experimentalConfig.disableMove && !ikaoni.playing && !vueApp.route.isRunning()) {
       var from = vueApp.users[vueApp.myUserID], to = physicalToLogical(event.offsetX * devicePixelRatio, event.offsetY * devicePixelRatio);
-      vueApp.route.add(graph?.search(from.logicalPositionX, from.logicalPositionY, to.x, to.y, from.direction));
+      vueApp.route.run(graph?.search(from.logicalPositionX, from.logicalPositionY, to.x, to.y, from.direction));
     }
   });
   // 経路移動
   vueApp.route = {
     queue: [],
-    next: function (prev) {
-      this.lastMovement = (new Date()).getTime();
-      if (!this.queue.length || (prev === 'room' ? Array !== this.queue[0].constructor : (prev && prev !== this.queue[0]))) {
-        this.clear();
-        return;
-      }
-      this.queue.shift();
-      this.move();
+    move: function (direction) {
+      var t = performance.now();
+      if (
+        vueApp.isLoadingRoom ||
+        vueApp.requestedRoomChange ||
+        vueApp.isWaitingForServerResponseOnMovement ||
+        (vueApp.users[vueApp.myUserID]?.isWalking && !(document.hidden && t - this.lastMovement > 1000))
+      )
+        return false;
+      vueApp.socket?.emit('user-move', direction);
+      this.lastMovement = t;
+      return vueApp.isWaitingForServerResponseOnMovement = true;
     },
-    move: async function () {
-      if (!this.queue.length)
-        return;
-      if (typeof this.queue[0] === 'string') {
-        var direction = this.queue[0];
-        while (true) {
-          var t = (vueApp.characterId === 'shar_naito' ? 250 : 300) * (vueApp.currentRoom.id === 'long_st' ? 0.5 : 1) - (new Date()).getTime() + this.lastMovement;
-          if (t > 0)
-            await sleep(t);
-          else
-            break;
-        }
-        vueApp.socket.emit('user-move', direction);
-      } else {
-        vueApp.changeRoom.apply(vueApp, this.queue[0]);
-      }
-    },
-    add: function (q) {
-      if (this.queue.length || q?.constructor !== Array)
+    run: async function (q) {
+      if (this.isRunning() || !q || q.constructor !== Array || !q.length)
         return;
       this.queue = q;
-      this.move();
+      while (this.queue.length) {
+        if (typeof this.queue[0] === 'string')
+          while (this.isRunning() && !this.move(this.queue[0]))
+            await sleep(100);
+        else
+          await vueApp.changeRoom.apply(vueApp, this.queue[0]);
+        this.queue.shift();
+      }
     },
     clear: function () {
       this.queue = [];
-      this.lastMovement = (new Date()).getTime();
+    },
+    isRunning: function () {
+      return this.queue.length;
     },
     lastMovement: 0
+  };
+  var sendNewPositionToServer = vueApp.sendNewPositionToServer;
+  vueApp.sendNewPositionToServer = function () {
+    if (vueApp.isWaitingForServerResponseOnMovement)
+      return;
+    var value = sendNewPositionToServer.apply(this, arguments);
+    if (vueApp.isWaitingForServerResponseOnMovement)
+      vueApp.route.clear();
+    return value;
   };
   // URL短縮
   document.addEventListener('paste', async event => {
     if (event.target.id === 'input-textbox') {
       var url = event.clipboardData.getData('text');
-      if (url.length > (event.target.maxLength || 500) - event.target.value.length && /^https?:\/\/[^\/]/.test(url)) {
+      if (url.length > (event.target.maxLength || 500) - event.target.value.length - 30 && /^(?:https?:\/\/[^\/]|data:)/.test(url)) {
         event.preventDefault();
-        var end, failed = function () {
+        if (url.startsWith('data:')) {
+          asyncAlert(text('長いdata URLは貼り付けられません', 'Cannot paste long data URL'));
+          return;
+        }
+        var end, failed = function (cause) {
           if (end)
             return;
           end = true;
-          asyncAlert(text('貼り付けようとしたURLが最大文字数をオーバーしています', 'Pasted URL is too long'));
+          cause = [text('タイムアウトにより', 'timeout'), text('エラーにより', 'shortener error')][cause];
+          asyncAlert(text(cause + '短縮に失敗しました。', 'Failed to shorten URL cause by ' + cause + '.'));
         };
-        setTimeout(failed, +experimentalConfig.shortenerTimeout * 1000 || 2000);
+        if (
+          experimentalConfig.confirmURLShortening &&
+          !await asyncConfirm(text('貼り付けようとしたURLが最大文字数を超えています。URLを短縮しますか？', 'Pasted URL is too long. Do you shorten this URL?') + '\n' + url.slice(0, 100) + '...')
+        )
+          return;
+        setTimeout(() => failed(0), +experimentalConfig.shortenerTimeout * 1000 || 3000);
         try {
           var shortURL = (await (await fetch('https://is.gd/create.php?format=json&url=' + encodeURIComponent(url))).json()).shorturl;
-          var domain = ('' + url.match(/^https?:\/\/([^\/]+)/)[1]).replace(/www\./, 'www\u200b.');
         } catch (err) {
-          console.log(err);
+          consolelog(err);
         }
         if (end)
           return;
         if (!shortURL || shortURL.indexOf('https://is.gd/'))
-          failed();
+          failed(1);
         else
-          event.target.value += shortURL + ` ( ${domain} )`;
+          event.target.value += shortURL;
         end = true;
       }
     }
@@ -3093,7 +3132,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
         if (after[i] !== ' ' && before[i] !== after[i])
           return 'abcdefgh'[i % 8] + (8 - Math.floor(i / 8));
     } catch (err) {
-      console.log(err);
+      consolelog(err);
     }
   };
   var chessSquare;
@@ -3197,18 +3236,21 @@ input{display:block;position:fixed;bottom:0;height:2em}
         if (dto && user)
           graph?.update(dto.userId, user.logicalPositionX, user.logicalPositionY, dto.x, dto.y);
         // 経路移動
-        if (dto?.direction && dto?.userId === vueApp.myUserID) {
-          vueApp.route.next(dto.direction);
-          if (graph)
-            graph.moved = true;
-        }
+        if (dto?.direction && dto?.userId === vueApp.myUserID && graph)
+          graph.moved = true;
         // 重なり回避
-        var myself = vueApp.users[vueApp.myUserID];
-        vueApp.route.add(graph.escape(dto?.userId === vueApp.myUserID ? dto : {x: myself?.logicalPositionX, y: myself?.logicalPositionY, direction: myself?.direction}, experimentalConfig.escape === 2));
+        if (!vueApp.route.isRunning()) {
+          var myself = vueApp.users[vueApp.myUserID];
+          vueApp.route.run(graph.escape(dto?.userId === vueApp.myUserID ? dto : {x: myself?.logicalPositionX, y: myself?.logicalPositionY, direction: myself?.direction}, experimentalConfig.escape === 2));
+        }
         break;
       case 'server-reject-movement':
         gamepad.vibrate();
-        vueApp.route.next();
+        // 重なり回避
+        if (!vueApp.route.isRunning()) {
+          var myself = vueApp.users[vueApp.myUserID];
+          vueApp.route.run(graph.escape({x: myself?.logicalPositionX, y: myself?.logicalPositionY, direction: myself?.direction}, experimentalConfig.escape === 2));
+        }
         break;
       case 'server-user-joined-room':
         var user = arguments[1];
@@ -3216,11 +3258,13 @@ input{display:block;position:fixed;bottom:0;height:2em}
         if (user)
           graph?.update(user.id, null, null, user.position.x, user.position.y);
         // 重なり回避
-        var myself = vueApp.users[vueApp.myUserID];
-        vueApp.route.add(graph.escape(user.id === vueApp.myUserID
-          ? {x: user.position.x, y: user.position.y, direction: user.direction}
-          : {x: myself?.logicalPositionX, y: myself?.logicalPositionY, direction: myself?.direction}
-        , experimentalConfig.escape === 2));
+        if (!vueApp.route.isRunning()) {
+          var myself = vueApp.users[vueApp.myUserID];
+          vueApp.route.run(graph.escape(user.id === vueApp.myUserID
+            ? {x: user.position.x, y: user.position.y, direction: user.direction}
+            : {x: myself?.logicalPositionX, y: myself?.logicalPositionY, direction: myself?.direction}
+          , experimentalConfig.escape === 2));
+        }
         // 入室ログ
         setTimeout(() => {
           if (!user || user.id === vueApp.myUserID)
@@ -3295,10 +3339,6 @@ input{display:block;position:fixed;bottom:0;height:2em}
         streamStates = arguments[1].streams.map(s => s.isActive && s.isReady && s.isAllowed && s.userId !== vueApp.myUserID);
         // ステミキ表示
         wsm.show(arguments[1].streams.some(s => s.userId === vueApp.myUserID && s.isActive && s.isReady && s.withSound));
-        // 経路移動
-        vueApp.route.next('room');
-        if (graph)
-          graph.moved = false;
         // チェス棋譜
         fens = [];
         break;
