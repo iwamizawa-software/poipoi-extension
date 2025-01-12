@@ -3239,7 +3239,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
         if (dto?.direction && dto?.userId === vueApp.myUserID && graph)
           graph.moved = true;
         // 重なり回避
-        if (!vueApp.route.isRunning()) {
+        if (!(vueApp.route.isRunning() || vueApp.isWaitingForServerResponseOnMovement)) {
           var myself = vueApp.users[vueApp.myUserID];
           vueApp.route.run(graph.escape(dto?.userId === vueApp.myUserID ? dto : {x: myself?.logicalPositionX, y: myself?.logicalPositionY, direction: myself?.direction}, experimentalConfig.escape === 2));
         }
@@ -3247,7 +3247,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
       case 'server-reject-movement':
         gamepad.vibrate();
         // 重なり回避
-        if (!vueApp.route.isRunning()) {
+        if (!(vueApp.route.isRunning() || vueApp.isWaitingForServerResponseOnMovement)) {
           var myself = vueApp.users[vueApp.myUserID];
           vueApp.route.run(graph.escape({x: myself?.logicalPositionX, y: myself?.logicalPositionY, direction: myself?.direction}, experimentalConfig.escape === 2));
         }
@@ -3258,7 +3258,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
         if (user)
           graph?.update(user.id, null, null, user.position.x, user.position.y);
         // 重なり回避
-        if (!vueApp.route.isRunning()) {
+        if (!(vueApp.route.isRunning() || vueApp.isWaitingForServerResponseOnMovement)) {
           var myself = vueApp.users[vueApp.myUserID];
           vueApp.route.run(graph.escape(user.id === vueApp.myUserID
             ? {x: user.position.x, y: user.position.y, direction: user.direction}
