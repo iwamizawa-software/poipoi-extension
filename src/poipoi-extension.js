@@ -1129,6 +1129,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
   contactButton.textContent = '問い合わせ Contact';
   contactButton.onclick = () => open('https://form1ssl.fc2.com/form/?id=019f176bae31cba6', '_blank', 'noreferrer');
   if (+localStorage.getItem('experimentalVersion') < VERSION) {
+    localStorage.removeItem('disableScript');
     var changelogButton = document.createElement('button');
     disableButtonContainer.append(changelogButton);
     changelogButton.textContent = '新機能 Whats new';
@@ -1138,6 +1139,15 @@ input{display:block;position:fixed;bottom:0;height:2em}
       localStorage.setItem('experimentalVersion', VERSION);
     };
   }
+  var downloadLink = document.createElement('a');
+  var downloadText = (text, fname) => {
+    URL.revokeObjectURL(downloadLink.href);
+    downloadLink.href = URL.createObjectURL(new Blob([text], {type: 'application/octet-stream'}));
+    downloadLink.download = fname;
+    downloadLink.click();
+  };
+  var errorLog = JSON.parse(localStorage.getItem('experimentalErrorLog')) || [];
+  var downloadErrorLog = () => downloadText(JSON.stringify(errorLog), 'error-log.txt');
   if (localStorage.getItem('disableScript')) {
     disableButton.textContent = '拡張機能を有効化 Enable extension';
     disableButton.style.background = '#5f5';
@@ -1155,23 +1165,20 @@ input{display:block;position:fixed;bottom:0;height:2em}
       }
     };
     disableButton.after(resetButton);
+    var errorLogButton = document.createElement('button');
+    errorLogButton.textContent = 'エラーログ Error Log';
+    errorLogButton.onclick = downloadErrorLog;
+    resetButton.after(errorLogButton);
     return;
   } else {
     disableButton.textContent = 'バグったら押す Disable extension';
     disableButton.onclick = () => {
       localStorage.setItem('disableScript', 'true');
+      localStorage.setItem('experimentalVersion', VERSION);
       alert('拡張機能が無効になりました。\nこれで治った場合拡張機能のバグなので報告お願いします。\nExtension has been disabled.');
       location.reload();
     };
   }
-  var downloadLink = document.createElement('a');
-  var downloadText = (text, fname) => {
-    URL.revokeObjectURL(downloadLink.href);
-    downloadLink.href = URL.createObjectURL(new Blob([text], {type: 'application/octet-stream'}));
-    downloadLink.download = fname;
-    downloadLink.click();
-  };
-  var errorLog = JSON.parse(localStorage.getItem('experimentalErrorLog')) || [];
   var consolelog = function () {
     try {
       var log = Array.from(arguments)
@@ -3072,7 +3079,7 @@ input{display:block;position:fixed;bottom:0;height:2em}
       } else if (t.value === '#ver') {
         t.value = VERSION;
       } else if (t.value === '#error') {
-        downloadText(JSON.stringify(errorLog), 'error-log.txt');
+        downloadErrorLog();
         t.value = '';
         return;
       } else if (t.value === '#ikaoni') {
