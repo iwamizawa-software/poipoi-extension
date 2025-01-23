@@ -1099,11 +1099,11 @@
       ['head', [
         ['title', title],
         ['meta', {name: 'viewport', content: 'width=device-width, initial-scale=1.0'}],
-        ['style', `
-html,body,#chatLog,input{margin:0;padding:0;box-sizing:border-box;width:100%;height:100%;resize:none;overflow:auto}
-#chatLog{height:calc(100% - 3em);padding:2px;font-size:12px}
+        ['style', `html,body{margin:0;padding:0;box-sizing:border-box;width:100%;height:100%}
+body{display:flex;flex-direction:column}
+#chatLog{overflow:auto;word-break:break-all;flex-grow:1}
+input{font-size:16px}
 .message-timestamp,.ignored-message{display:none}
-input{display:block;position:fixed;bottom:0;height:2em}
 .inactive-message:before{opacity:0.5}`],
         ['style', {id: 'log-style'}],
         ...colorStyleJSML
