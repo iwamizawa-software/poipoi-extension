@@ -1,0 +1,5 @@
+またの名を「ルドルフの数」といい、算数の授業でも習うこの数字のことを漢字3文字でなんと言う？,円周率,えんしゅうりつ
+腎臓の機能不全のため、尿として排出されるべき成分が血中に溜まることによって起こる中毒症状は？,尿毒症,にょうどくしょう
+どこの国旗でしょうか？https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Flag_of_Canada.svg/800px-Flag_of_Canada.svg.png,カナダ
+どこの国歌でしょうか？https://www.youtube.com/watch?v=UctriMuXYS0,中国,中華人民共和国
+2,どこの国歌でしょうか？https://youtu.be/k3IQC3HCg-w?t=4,ソ連,ソビエト
