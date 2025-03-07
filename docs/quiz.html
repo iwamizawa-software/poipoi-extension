@@ -48,7 +48,8 @@ var code = () => {
     alert('ぽいぽいのページでquizを押してください。');
     return;
   }
-  var app = location.host === 'play.gikopoi.com' ? window.vueApp : window.vueApp?._container?._vnode?.component?.proxy;
+  var isPlay = location.host === 'play.gikopoi.com';
+  var app = isPlay ? window.vueApp : window.vueApp?._container?._vnode?.component?.proxy;
   if (!app) {
     alert('エラー：Vueインスタンスを取得できませんでした。');
     return;
@@ -62,7 +63,10 @@ var code = () => {
           quizWindow.postMessage(Array.from(arguments), 'https://iwamizawa-software.github.io')
       });
     })();
-  window.quizWindow = open('https://iwamizawa-software.github.io/experimental-poipoi/quiz.html' + (app.areaId === 'gen' ? '' : '?en'), JSON.stringify(Object.values(app.users).map(({id, name, character}) => ({id, name, characterId: character.characterName}))));
+  window.quizWindow = open(
+    'https://iwamizawa-software.github.io/experimental-poipoi/quiz.html' + (app.areaId === 'gen' ? '' : '?en' + (isPlay ? 'play' : '')),
+    JSON.stringify(Object.values(app.users).map(({id, name, character}) => ({id, name, characterId: character.characterName})))
+  );
   if (!quizWindow) {
     window.quizWindow = {closed: true};
     alert('ポップアップブロックを解除してください。');
