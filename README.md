@@ -24,12 +24,7 @@
 
 [Firefoxはこのページから追加する](https://addons.mozilla.org/ja/firefox/addon/poipoi-extension/)
 
-### AndroidでKiwiを使う場合
-
-1. [Kiwi Browserをインストール](https://play.google.com/store/apps/details?id=com.kiwibrowser.browser&hl=ja)
-2. [Kiwiからこのページを開いて追加する](https://chromewebstore.google.com/detail/%E3%81%BD%E3%81%84%E3%81%BD%E3%81%84%E6%8B%A1%E5%BC%B5/dchhhmhghoakioefjlajidbigkppfhbd?hl=ja)
-
-### AndroidでFirefoxを使う場合
+### Androidの場合
 
 1. [Firefoxをインストール (Nightlyとかじゃなくていいです)](https://play.google.com/store/apps/details?id=org.mozilla.firefox&hl=ja)
 2. [Firefoxからこのページを開いて追加する](https://addons.mozilla.org/ja/firefox/addon/poipoi-extension/)
