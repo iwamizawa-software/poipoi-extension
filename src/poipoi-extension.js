@@ -4,7 +4,7 @@
     return;
   window.extension = true;
 
-  var VERSION = 93;
+  var VERSION = 97;
   var innerJSML = element => Array.from(element.childNodes).map(node => {
     if (node.tagName) {
       var attrs = {};
@@ -146,6 +146,12 @@
         name: 'PIP',
         type: 'checkbox',
         value: false
+      },
+      {
+        key: 'rightNewMessagesButton',
+        name: text('↓新しいメッセージボタンを右に表示', 'Right-align ↓New Messages button'),
+        type: 'onoff',
+        value: 0
       },
       {
         key: 'vtuberNiconico',
@@ -1719,7 +1725,8 @@ input{font-size:16px}
                         (experimentalConfig.brightness ? '#room-canvas{filter: brightness(' + experimentalConfig.brightness + ')}' : '') +
                         (experimentalConfig.showColorPicker ? '' : '#colorPicker{visibility:hidden;width:0;padding:0;border:0}') +
                         (experimentalConfig.silence || /iPhone|iPad/.test(navigator.userAgent) ? '' : '#silence{display:none}') +
-                        (experimentalConfig.outdoor ? 'h1,#character-selection,#canvas-container,.changelog{display:none}' : '');
+                        (experimentalConfig.outdoor ? 'h1,#character-selection,#canvas-container,.changelog{display:none}' : '') +
+                        (experimentalConfig.rightNewMessagesButton ? '#new-message-button-container button{position:absolute;right:30px;font-size:0}#new-message-button-container button:before{content:"↓";font-size:13px}' : '');
     if (experimentalConfig.iconSize)
       characterLogCSS.textContent = characterLogCSS.textContent.replace(/--characterlog-size:\d+px/, '--characterlog-size:' + experimentalConfig.iconSize + 'px');
     characterLogCSS.media = experimentalConfig.displayIcon ? '' : 'a';
