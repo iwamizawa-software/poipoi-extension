@@ -4,7 +4,7 @@
     return;
   window.extension = true;
 
-  var VERSION = 97;
+  var VERSION = 98;
   var innerJSML = element => Array.from(element.childNodes).map(node => {
     if (node.tagName) {
       var attrs = {};
@@ -1248,44 +1248,47 @@ input{font-size:16px}
       observer.observe(document.body, {subtree: true, childList: true});
     observedSelectors.push({selector, resolve});
   });
-  // PIP
-  if (HTMLVideoElement.prototype.requestPictureInPicture) {
-    querySelectorAsync('#video-streams').then(element => {
-      var observer = new MutationObserver(() => {
-        Array.from(element.querySelectorAll('.stream-buttons')).forEach(div => {
-          var experimentalButtons = Array.from(div.querySelectorAll('.experimental-buttons'));
-          if (div.querySelector('[id^=drop-stream-button]') && div.parentNode.querySelector('[id^=video-container]')?.style.display === '') {
-            if (!experimentalButtons.length) {
-              var pipButton = document.createElement('button');
-              pipButton.className = 'experimental-buttons';
-              pipButton.textContent = 'PIP';
-              pipButton.onclick = () => {
-                var video = div.parentNode.querySelector('[id^=received-video]');
-                if (video) {
-                  video.onpause = video.play;
-                  video.requestPictureInPicture().catch(async err => {
-                    if (err.name === 'NotSupportedError') {
-                      if (navigator.userAgent?.includes('Android')) {
-                        await asyncAlert(text('全画面表示になったら画面下から上にスワイプし、ホームボタンを押してください', 'Press home button after fullscreen'));
-                        video.requestFullscreen();
-                      } else {
-                        experimentalConfig.hidePIP = experimentalConfig.hideWidgetButton = true;
-                        modifyConfig(experimentalConfig, true);
-                      }
+  // PIP ステミキ
+  querySelectorAsync('#video-streams').then(element => {
+    var streamButtons = element.getElementsByClassName('stream-buttons');
+    var muteButtons = element.getElementsByClassName('mute-unmute-button');
+    var observer = new MutationObserver(() => {
+      wsm.show(muteButtons[0]);
+      if (!HTMLVideoElement.prototype.requestPictureInPicture)
+        return;
+      Array.from(streamButtons).forEach(div => {
+        var experimentalButtons = Array.from(div.getElementsByClassName('experimental-buttons'));
+        if (div.querySelector('[id^=drop-stream-button]') && div.parentNode.querySelector('[id^=video-container]')?.style.display === '') {
+          if (!experimentalButtons.length) {
+            var pipButton = document.createElement('button');
+            pipButton.className = 'experimental-buttons';
+            pipButton.textContent = 'PIP';
+            pipButton.onclick = () => {
+              var video = div.parentNode.querySelector('[id^=received-video]');
+              if (video) {
+                video.onpause = video.play;
+                video.requestPictureInPicture().catch(async err => {
+                  if (err.name === 'NotSupportedError') {
+                    if (navigator.userAgent?.includes('Android')) {
+                      await asyncAlert(text('全画面表示になったら画面下から上にスワイプし、ホームボタンを押してください', 'Press home button after fullscreen'));
+                      video.requestFullscreen();
+                    } else {
+                      experimentalConfig.hidePIP = experimentalConfig.hideWidgetButton = true;
+                      modifyConfig(experimentalConfig, true);
                     }
-                  });
-                }
+                  }
+                });
               }
-              div.insertBefore(pipButton, div.firstChild);
             }
-          } else {
-            experimentalButtons.forEach(button => button.remove());
+            div.insertBefore(pipButton, div.firstChild);
           }
-        });
+        } else {
+          experimentalButtons.forEach(button => button.remove());
+        }
       });
-      observer.observe(element, {subtree: true, childList: true});
     });
-  }
+    observer.observe(element, {subtree: true, childList: true});
+  });
   var abonQueue = [];
   var abon = async function (id) {
     abonQueue.push(id);
@@ -2625,13 +2628,16 @@ input{font-size:16px}
       input.value = input.dataset.value ? +input.dataset.value : 1;
       input.disabled = false;
       input.oninput();
+      errorLog.push({date: (new Date()).toLocaleString(), room: vueApp.currentRoom?.id, log: 'Push unmute'});
     });
     return result;
   };
   var wsm = {
-    show: async function (show) {
-      if (show) {
-        var mutebtn = await querySelectorAsync('button.mute-unmute-button');
+    show: async function (mutebtn) {
+      if (mutebtn) {
+        if (mutebtn.dataset.applied)
+          return;
+        mutebtn.dataset.applied = true;
         if (!this.addAudio) {
           JSML(this.addAudio = document.createElement('select'), 'append', [
             ['option', text('配信音声の追加', 'Add voice')],
@@ -2741,6 +2747,7 @@ input{font-size:16px}
       vol.oninput = function () {
         gain.gain.value = vol.value;
       };
+      errorLog.push({date: (new Date()).toLocaleString(), room: vueApp.currentRoom?.id, log: 'addVolume'});
     }
   };
   // グラフ
@@ -3351,8 +3358,6 @@ input{font-size:16px}
       case 'server-update-current-room-state':
         // 配信通知
         streamStates = arguments[1].streams.map(s => s.isActive && s.isReady && s.isAllowed && s.userId !== vueApp.myUserID);
-        // ステミキ表示
-        wsm.show(arguments[1].streams.some(s => s.userId === vueApp.myUserID && s.isActive && s.isReady && s.withSound));
         // チェス棋譜
         fens = [];
         break;
@@ -3366,8 +3371,6 @@ input{font-size:16px}
           streamNotification(user, index);
           widget.streaming(user.id, user.name);
         }
-        // ステミキ表示
-        wsm.show(arguments[1].some(s => s.userId === vueApp.myUserID && s.isActive && s.isReady && s.withSound));
         break;
       // 全部屋ﾙｰﾗ
       case 'server-room-list':
