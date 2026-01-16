@@ -1978,7 +1978,7 @@ input{font-size:16px}
     if (match(userDTO.name, ['/' + vueApp.toDisplayName('') + '\\d+/']))
       userDTO.name = '(' + userDTO.name + ')';
     // 偽トリップ
-    userDTO.name = userDTO.name?.replace(/◇|◊|🔶|🔷|🔸|🔹/g, 'O');
+    userDTO.name = userDTO.name?.replace(/◇|◊|🔶|🔷|🔸|🔹|♢|♦|⧫|⬧|⬨|⬪|⬫/g, 'O');
     // 名無しナンバリング
     if (experimentalConfig.numbering && typeof userDTO.id === 'string') {
       userDTO.name = vueApp.toDisplayName(userDTO.name);
