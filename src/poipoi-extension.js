@@ -4,7 +4,7 @@
     return;
   window.extension = true;
 
-  var VERSION = 98;
+  var VERSION = 100;
   var innerJSML = element => Array.from(element.childNodes).map(node => {
     if (node.tagName) {
       var attrs = {};
@@ -1346,7 +1346,7 @@ input{font-size:16px}
   if (localStorage.getItem('isInfoboxVisible') === null)
     vueApp.toggleInfobox();
 
-  var text = (_gen, _for) => vueApp.areaId === 'gen' ? _gen : _for;
+  var text = (_gen, _for) => vueApp.preferences.areaId === 'gen' ? _gen : _for;
   var systemMessage = msg => vueApp.writeMessageToLog('SYSTEM', msg, null);
   var sendMessage = function (msg, silent) {
     vueApp.socket.emit('user-msg', msg);
@@ -2279,7 +2279,7 @@ input{font-size:16px}
   var onlogin = function () {
     document.getElementById('disableButtonContainer')?.remove();
     // PIP ステミキ
-    querySelectorAsync('#video-streams').then(element => {
+    querySelectorAsync('#stream-section').then(element => {
       var streamButtons = element.getElementsByClassName('stream-buttons');
       var muteButtons = element.getElementsByClassName('mute-unmute-button');
       var observer = new MutationObserver(() => {
@@ -2486,7 +2486,7 @@ input{font-size:16px}
     vueApp.connectToServer = async function () {
       // 内藤髪制御
       if (localStorage.getItem('characterId') === 'naito' && experimentalConfig.hairControl) {
-        arguments[2] = vueApp.characterId = experimentalConfig.hairControl === 1 ? 'naito' : 'funkynaito';
+        arguments[1] = vueApp.characterId = experimentalConfig.hairControl === 1 ? 'naito' : 'funkynaito';
         vueApp.selectedCharacter = vueApp.allCharacters.find(c => c.characterName === vueApp.characterId);
       }
       var r = await connectToServer.apply(this, arguments);
@@ -3371,15 +3371,6 @@ input{font-size:16px}
           streamNotification(user, index);
           widget.streaming(user.id, user.name);
         }
-        break;
-      // 全部屋ﾙｰﾗ
-      case 'server-room-list':
-        var streams = 0;
-        arguments[1].forEach(room => streams += room.streams.length);
-        arguments[1].push(
-          {id: 'admin_old', group: 'gikopoi', userCount: '?', streamers: [], streams: +vueApp.serverStats.streamCount <= streams ? [] : [{userName: '?'}]},
-          {id: 'badend', group: 'gikopoipoi', userCount: '?', streamers: [], streams: []}
-        );
         break;
       case 'server-update-chessboard':
         var state = arguments[1] || {};

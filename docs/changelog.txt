@@ -1,3 +1,4 @@
+2025/6/27	本家リファクタリングに伴う不具合の修正、gikopoi.huサポート終了、ルーラ非表示部屋表示機能削除（素早く行く方法知りたい方は拡張作者に聞いてください）
 2025/10/26	↓新しいメッセージボタンを右揃えにする設定追加
 2025/1/7	エラーログ保存機能　ゲームコントローラー対応
 2024/12/11	セキュリティの向上
@@ -43,6 +44,7 @@
 2022/6/11	音声入力
 2022/6/5	名無しナンバリング、自動あぼーん、動画配信を別タブで開く、メンション通知機能、ログ右クリックメニュー
 
+2026/6/27	Fix bug and delete showing Lost Lounge on rula and end support gikopoi.hu
 2025/10/26	Configurable right-align new message button
 2025/1/7	Gamepad available and #error
 2024/12/11	Set Content Security Policy (for preventing XSS)

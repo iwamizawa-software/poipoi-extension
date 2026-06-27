@@ -3,7 +3,7 @@
   "default_locale": "en_US",
   "name": "__MSG_extName__",
   "description": "__MSG_extDescription__",
-  "version": "99",
+  "version": "100",
   "author": "iwamizawa-software",
   "content_scripts": [
     {
@@ -11,16 +11,14 @@
         "poipoi-extension.js"
       ],
       "matches": [
-        "https://gikopoipoi.net/*",
-        "https://gikopoi.hu/*"
+        "https://gikopoipoi.net/*"
       ],
       "world": "MAIN"
     }
   ],
   "permissions": ["declarativeNetRequest"],
   "host_permissions": [
-    "https://gikopoipoi.net/*",
-    "https://gikopoi.hu/*"
+    "https://gikopoipoi.net/*"
   ],
   "declarative_net_request": {
     "rule_resources": [
