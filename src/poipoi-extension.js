@@ -1227,6 +1227,10 @@ input{font-size:16px}
   };
   var sleep = t => ({then: f => setTimeout(f, t)});
   var getObjectAsync = async function (obj, key) {
+    if (key.includes('.')) {
+      var keys = key.split('.');
+      return await getObjectAsync(await getObjectAsync(obj, keys[0]), keys.slice(1).join('.'));
+    }
     while (!obj[key])
       await sleep(1000);
     return obj[key];
@@ -1254,7 +1258,7 @@ input{font-size:16px}
     if (abonQueue.length > 1)
       return;
     while (abonQueue.length) {
-      (await getObjectAsync(vueApp, 'socket')).emit('user-block', abonQueue[0]);
+      (await getObjectAsync(vueApp, 'roomSession.socket')).emit('user-block', abonQueue[0]);
       await sleep(100);
       abonQueue.shift();
     }
@@ -1349,9 +1353,9 @@ input{font-size:16px}
   var text = (_gen, _for) => vueApp.preferences.areaId === 'gen' ? _gen : _for;
   var systemMessage = msg => vueApp.writeMessageToLog('SYSTEM', msg, null);
   var sendMessage = function (msg, silent) {
-    vueApp.socket.emit('user-msg', msg);
+    vueApp.roomSession.socket.emit('user-msg', msg);
     if (experimentalConfig.clearBubble || silent)
-      vueApp.socket.emit('user-msg', '');
+      vueApp.roomSession.socket.emit('user-msg', '');
   };
   // Mozilla 誤検出対策
   var asyncAlert = text => new Promise(resolve => vueApp['openDialog'](text, '', ['OK'], 0, resolve));
@@ -1624,7 +1628,7 @@ input{font-size:16px}
           vueApp.openUserListPopup();
         break;
       case 'henshin':
-        vueApp.socket?.emit('user-msg', '#henshin');
+        vueApp.roomSession.socket?.emit('user-msg', '#henshin');
         break;
       case 'recieve':
         if (document.querySelector('.popup-overlay'))
@@ -1659,7 +1663,7 @@ input{font-size:16px}
         break;
     }
   };
-  gamepad.onGamepadMove = (index, direction) => vueApp.socket && !document.querySelector('.popup-overlay') && vueApp[index ? 'sendNewBubblePositionToServer' : 'sendNewPositionToServer'](direction);
+  gamepad.onGamepadMove = (index, direction) => vueApp.roomSession.socket && !document.querySelector('.popup-overlay') && vueApp[index ? 'sendNewBubblePositionToServer' : 'sendNewPositionToServer'](direction);
   gamepad.onGamepadMoveAsDPad = (index, x, y) => {
     if (!(document.querySelector('.popup-overlay') || document.getElementById('login-button')) || index !== 0)
       return;
@@ -1902,12 +1906,12 @@ input{font-size:16px}
       logWindow.onresize();
     // デフォで変身
     if (experimentalConfig.henshin && !henshined) {
-      getObjectAsync(vueApp, 'socket').then(socket => socket.emit('user-msg', '#henshin'));
+      getObjectAsync(vueApp, 'roomSession.socket').then(socket => socket.emit('user-msg', '#henshin'));
       henshined = true;
     }
     // デフォで吹き出し位置変更
     if (experimentalConfig.bubblePosition && !bubbleChanged) {
-      getObjectAsync(vueApp, 'socket').then(socket => socket.emit('user-bubble-position', ['up', 'right',  'left',  'down'][experimentalConfig.bubblePosition]));
+      getObjectAsync(vueApp, 'roomSession.socket').then(socket => socket.emit('user-bubble-position', ['up', 'right',  'left',  'down'][experimentalConfig.bubblePosition]));
       bubbleChanged = true;
     }
     // グラフ
@@ -1949,7 +1953,7 @@ input{font-size:16px}
       userDTO.name += '(偽)';
     // 自動あぼーん
     if (
-      userDTO.id !== vueApp.myUserID && vueApp.socket &&
+      userDTO.id !== vueApp.myUserID && vueApp.roomSession.socket &&
       (
         match(userDTO.name, experimentalConfig.autoBlock, experimentalConfig.filteringHelper) ||
         (experimentalConfig.ignoreAll === 2 && !match(userDTO.name, experimentalConfig.unignoreList))
@@ -2112,7 +2116,7 @@ input{font-size:16px}
   vueApp.handleMessageInputKeypress = function (event) {
     var v = handleMessageInputKeypress.apply(this, arguments);
     if (experimentalConfig.clearBubble && v === false)
-      vueApp.socket.emit('user-msg', '');
+      vueApp.roomSession.socket.emit('user-msg', '');
     return v;
   };
   // 自動色分け
@@ -2424,7 +2428,7 @@ input{font-size:16px}
         logWindow.document.body.lastElementChild.onkeydown = autoComplete.onkeydown;
       })();
     };
-    addEventListener('unload', () => {
+    addEventListener('beforeunload', () => {
       if (logWindow && !logWindow.closed) {
         logWindow.document.title = text('切断されたログ', 'Disconnected log');
         logWindow.clearInterval(logWindow.interval);
@@ -2922,7 +2926,7 @@ input{font-size:16px}
         (vueApp.users[vueApp.myUserID]?.isWalking && !(document.hidden && t - this.lastMovement > 1000))
       )
         return false;
-      vueApp.socket?.emit('user-move', direction);
+      vueApp.roomSession.socket?.emit('user-move', direction);
       this.lastMovement = t;
       return vueApp.isWaitingForServerResponseOnMovement = true;
     },
@@ -3078,7 +3082,7 @@ input{font-size:16px}
         t.value = '';
         return;
       } else if (t.value.startsWith('#block ')) {
-        vueApp.socket.emit('user-block', t.value.slice(7));
+        vueApp.roomSession.socket.emit('user-block', t.value.slice(7));
         t.value = '';
         return;
       } else if (t.value.startsWith('#select ')) {
@@ -3392,17 +3396,6 @@ input{font-size:16px}
         break;
     }
   };
-  var _io = window.io;
-  if (_io) {
-    window.io = function () {
-      var socket = _io.apply(this, arguments);
-      socket.prependAny(socketEvent);
-      return socket;
-    };
-    if (vueApp.socket)
-      vueApp.socket.prependAny(socketEvent);
-  } else {
-    (await getObjectAsync(vueApp, 'socket')).prependAny(socketEvent);
-  }
+  (await getObjectAsync(vueApp, 'roomSession.socket')).prependAny(socketEvent);
 
 })();
