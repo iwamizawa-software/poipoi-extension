@@ -68,6 +68,13 @@
           text('１歩逃げる', 'Escape to a step'),
           text('遠くに逃げる', 'Escape to far away')
         ],
+        relations: ['escapeFromStalker'],
+        value: 0
+      },
+      {
+        key: 'escapeFromStalker',
+        name: text('キャラが周囲にいるときも逃げる', 'Escape from stalker'),
+        type: 'onoff',
         value: 0
       },
       {
@@ -2877,27 +2884,29 @@ input{font-size:16px}
     }
     if (!experimentalConfig.escape || !this.moved)
       return;
-    var candidate = [], second = [];
-    var queue = [{node: currentNode, path: {length: 0}}], current, flag = currentNode.flag = [true];
+    var candidate = [], near = [];
+    var queue = [{node: currentNode, path: {length: 0}, depth: 0}], current, flag = currentNode.flag = [true];
     while (current = queue.shift()) {
       var iterator = current.node.edges.entries();
       for (var [node, edge] of iterator) {
         if (node.flag[0] || !edge.direction || node.door)
           continue;
-        var i = current.path.length, child = {node, path: {length: i}};
+        var i = current.path.length, child = {node, path: {length: i}, depth: current.depth + 1};
         if ((current.path[i - 1] || direction) !== edge.direction)
           child.path[child.path.length++] = edge.direction;
         child.path[child.path.length++] = edge.direction;
         child.path.__proto__ = current.path;
         node.flag = flag;
         queue.push(child);
-        (node.users.size || (far && child.path.length < 4) ? second : candidate).push(child.path);
+        if (!node.users.size)
+          (far && child.path.length < 4 ? near : candidate).push(child.path);
       }
-      if (!far)
+      if (!far && candidate.length && queue[0]?.depth !== current.depth)
         break;
     }
     flag[0] = false;
-    return Array.from((candidate.length ? candidate[Math.random() * candidate.length | 0] : second[Math.random() * second.length | 0]) || []);
+    var list = candidate.length ? candidate : near;
+    return Array.from(list[Math.random() * list.length | 0] || []);
   };
   // ダブルクリックで移動
   var physicalToLogical = function (x, y) {
