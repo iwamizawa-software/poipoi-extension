@@ -2766,6 +2766,7 @@ input{font-size:16px}
     this.moved = moved;
     this.nodes = JSON.parse('[' + ('[' + '{},'.repeat(currentRoom.size.x).slice(0, -1) + '],').repeat(currentRoom.size.y).slice(0, -1) + ']');
     this.room = currentRoom.id;
+    this.epoch = 0;
     currentRoom.blocked.forEach(({x, y}) => this.nodes[y][x] = null);
     if (this.room === 'idoA')
       delete this.nodes[6][6];
@@ -2793,7 +2794,9 @@ input{font-size:16px}
         else if (tmp === null)
           node.blocked = 'up';
         node.users = new Map();
-        node.flag = flag;
+        node.visited = 0;
+        node.x = x;
+        node.y = y;
       }
     currentRoom.forbiddenMovements.forEach(({xFrom, yFrom, xTo, yTo}) => {
       var from = this.nodes[yFrom]?.[xFrom], to = this.nodes[yTo]?.[xTo];
@@ -2832,48 +2835,56 @@ input{font-size:16px}
     var from = this.nodes[yFrom]?.[xFrom];
     if (!from || target === from)
       return;
-    var queue = [{node: target, path: {length: 0}}], current, door, flag = target.flag = [true];
-    while (current = queue.shift()) {
-      var iterator = current.node.edges.entries();
-      for (var [node, edge] of iterator) {
-        if (node.flag[0] || !edge.reverse || (door && node.door && from !== node))
+    var build = (c, facing, path) => {
+      for (; c.parent; c = c.parent) {
+        if (facing !== c.direction)
+          path.push(c.direction);
+        path.push(facing = c.direction);
+      }
+      if (target.blocked && target.blocked !== facing)
+        path.push(target.blocked);
+      return path;
+    };
+    var queue = [{node: target}], current, door, epoch = target.visited = ++this.epoch;
+    for (var i = 0; current = queue[i]; i++) {
+      for (var [node, edge] of current.node.edges) {
+        if (node.visited === epoch || !edge.reverse || (door && node.door && from !== node))
           continue;
-        var i = current.path.length, child = {node, path: {length: i}};
-        if (i && current.path[i - 1] !== edge.reverse)
-          child.path[child.path.length++] = current.path[i - 1];
-        child.path[child.path.length++] = edge.reverse;
-        child.path.__proto__ = current.path;
-        if (from === node) {
-          if (direction !== edge.reverse)
-            child.path[child.path.length++] = edge.reverse;
-          flag[0] = false;
-          var path = Array.from(child.path).reverse();
-          if (target.blocked && target.blocked !== child.path[0])
-            path.push(target.blocked);
-          return path;
-        }
-        node.flag = flag;
+        var child = {node, parent: current, direction: edge.reverse};
+        if (from === node)
+          return build(child, direction, []);
+        node.visited = epoch;
         if (node.door) {
-          if (node.door.direction !== edge.reverse)
-            child.path[child.path.length++] = edge.reverse;
-          child.path[child.path.length++] = [this.room, node.door.id];
-          door = Array.from(child.path).reverse();
-          if (target.blocked && target.blocked !== child.path[0])
-            door.push(target.blocked);
+          door = build(child, node.door.direction, [[this.room, node.door.id]]);
           continue;
         }
         queue.push(child);
       }
     }
-    flag[0] = false;
     return door || (target.door && [[this.room, target.door.id]]);
+  };
+  Graph.prototype.stalked = function (node, myNode) {
+    if (!node.around) {
+      node.around = [];
+      for (var dy = -1; dy < 2; dy++)
+        for (var dx = -1; dx < 2; dx++) {
+          var tmp = (dx || dy) && this.nodes[node.y + dy]?.[node.x + dx];
+          if (tmp)
+            node.around.push(tmp);
+        }
+    }
+    for (var a of node.around)
+      if (a.users.size > (a === myNode))
+        return true;
+    return false;
   };
   Graph.prototype.escape = function ({x, y, direction}, far) {
     var currentNode = this.nodes[y]?.[x];
-    if (!currentNode || currentNode.users.size < 2 || currentNode.door?.target)
+    if (!currentNode || currentNode.door?.target)
       return;
+    var overlapped = currentNode.users.size > 1;
     // いかおに
-    if (ikaoni.playing && !ikaoni.ikaed) {
+    if (overlapped && ikaoni.playing && !ikaoni.ikaed) {
       Object.keys(ikaoni.players).some(id => {
         if (currentNode.users.has(id) && vueApp.myUserID !== id && vueApp.users[id]?.character?.characterName === 'ika') {
           sendMessage('#ika');
@@ -2884,29 +2895,37 @@ input{font-size:16px}
     }
     if (!experimentalConfig.escape || !this.moved)
       return;
-    var candidate = [], near = [];
-    var queue = [{node: currentNode, path: {length: 0}, depth: 0}], current, flag = currentNode.flag = [true];
-    while (current = queue.shift()) {
-      var iterator = current.node.edges.entries();
-      for (var [node, edge] of iterator) {
-        if (node.flag[0] || !edge.direction || node.door)
+    var stalker = experimentalConfig.escapeFromStalker;
+    if (!overlapped && !(stalker && this.stalked(currentNode, currentNode)))
+      return;
+    var candidate = [], near = [], fallback = [];
+    var queue = [{node: currentNode, direction, length: 0, depth: 0}], current, epoch = currentNode.visited = ++this.epoch;
+    for (var i = 0; current = queue[i]; i++) {
+      for (var [node, edge] of current.node.edges) {
+        if (node.visited === epoch || !edge.direction || node.door)
           continue;
-        var i = current.path.length, child = {node, path: {length: i}, depth: current.depth + 1};
-        if ((current.path[i - 1] || direction) !== edge.direction)
-          child.path[child.path.length++] = edge.direction;
-        child.path[child.path.length++] = edge.direction;
-        child.path.__proto__ = current.path;
-        node.flag = flag;
+        var turn = current.direction !== edge.direction;
+        var child = {node, parent: current, direction: edge.direction, turn, length: current.length + 1 + turn, depth: current.depth + 1};
+        node.visited = epoch;
         queue.push(child);
-        if (!node.users.size)
-          (far && child.path.length < 4 ? near : candidate).push(child.path);
+        if (node.users.size)
+          continue;
+        if (stalker && this.stalked(node, currentNode)) {
+          if (overlapped && !(fallback.depth < child.depth)) {
+            fallback.depth = child.depth;
+            fallback.push(child);
+          }
+          continue;
+        }
+        (far && child.length < 4 ? near : candidate).push(child);
       }
-      if (!far && candidate.length && queue[0]?.depth !== current.depth)
+      if (!far && candidate.length && queue[i + 1]?.depth !== current.depth)
         break;
     }
-    flag[0] = false;
-    var list = candidate.length ? candidate : near;
-    return Array.from(list[Math.random() * list.length | 0] || []);
+    var list = candidate.length ? candidate : near.length ? near : fallback, path = [];
+    for (var c = list[Math.random() * list.length | 0]; c?.parent; c = c.parent)
+      c.turn ? path.push(c.direction, c.direction) : path.push(c.direction);
+    return path.reverse();
   };
   // ダブルクリックで移動
   var physicalToLogical = function (x, y) {
