@@ -4,7 +4,7 @@
     return;
   window.extension = true;
 
-  var VERSION = 100;
+  var VERSION = 102;
   var innerJSML = element => Array.from(element.childNodes).map(node => {
     if (node.tagName) {
       var attrs = {};
