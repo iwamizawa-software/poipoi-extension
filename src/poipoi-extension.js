@@ -1726,7 +1726,7 @@ input{font-size:16px}
   };
   window.modifyConfig = function (obj, mainWindow) {
     var json = JSON.stringify(obj);
-    if (experimentalConfig.useCookie) {
+    if (obj.useCookie) {
       document.cookie = 'experimentalConfig=' + encodeURIComponent(json) + '; expires=Tue, 31-Dec-2037 00:00:00 GMT;';
     } else {
       document.cookie = 'experimentalConfig=; expires=Fri, 31-Dec-1999 23:59:59 GMT;';
