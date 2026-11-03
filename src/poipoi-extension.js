@@ -1364,8 +1364,7 @@ input{font-size:16px}
     if (experimentalConfig.clearBubble || silent)
       vueApp.roomSession.socket.emit('user-msg', '');
   };
-  // Mozilla 誤検出対策
-  var asyncAlert = text => new Promise(resolve => vueApp['openDialog'](text, '', ['OK'], 0, resolve));
+  var asyncAlert = text => vueApp.$refs.dialogPopup.openDialog({message: text, title: '', buttons: ['OK']});
   var asyncConfirm = t => new Promise(resolve => vueApp.confirm(t, () => resolve(true), () => resolve(false)));
   var createButtonContainer = function () {
     var fakePopup = document.createElement('div');
@@ -2120,7 +2119,12 @@ input{font-size:16px}
   };
   // Enter1回で吹き出しを消す
   var handleMessageInputKeypress = vueApp.handleMessageInputKeypress;
-  vueApp.handleMessageInputKeypress = function (event) {
+  vueApp.handleMessageInputKeypress = handleMessageInputKeypress.constructor.name === 'AsyncFunction' ? async function (event) {
+    var v = await handleMessageInputKeypress.apply(this, arguments);
+    if (experimentalConfig.clearBubble && v === false)
+      vueApp.roomSession.socket.emit('user-msg', '');
+    return v;
+  } : function (event) {
     var v = handleMessageInputKeypress.apply(this, arguments);
     if (experimentalConfig.clearBubble && v === false)
       vueApp.roomSession.socket.emit('user-msg', '');
